@@ -1,0 +1,197 @@
+import logging
+import time
+from collections import defaultdict
+
+from fastapi import APIRouter, Depends, HTTPException
+from pymongo.errors import DuplicateKeyError
+
+from database import get_db, get_groups_col, ROLE_ADMIN, ROLE_TEACHER, ROLE_STUDENT, ROLE_UNASSIGNED
+from security import hash_password, verify_password, create_token, get_current_user
+from models import LoginRequest, RegisterRequest, ChangeRoleRequest, ChangePasswordRequest, ResetPasswordRequest, GroupBody
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# Simple in-memory rate limiter for login endpoint
+_login_attempts: dict = defaultdict(list)
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 10  # max attempts per window
+
+
+@router.post("/auth/login")
+async def login(req: LoginRequest):
+    # Rate limiting
+    now = time.time()
+    _login_attempts[req.username] = [t for t in _login_attempts[req.username] if now - t < _RATE_LIMIT_WINDOW]
+    if len(_login_attempts[req.username]) >= _RATE_LIMIT_MAX:
+        raise HTTPException(429, "Слишком много попыток входа. Попробуйте позже.")
+    _login_attempts[req.username].append(now)
+
+    col = get_db()
+    user = col.find_one({"username": req.username})
+    if not user or not verify_password(req.password, user["password"]):
+        raise HTTPException(401, "Неверное имя пользователя или пароль.")
+    role = user.get("role", ROLE_STUDENT)
+    if role == ROLE_UNASSIGNED:
+        raise HTTPException(403, "Учетная запись не активирована или роль не назначена.")
+    # Upgrade legacy SHA-256 hash to bcrypt on successful login
+    if len(user["password"]) == 64:
+        try:
+            col.update_one(
+                {"username": req.username},
+                {"$set": {"password": hash_password(req.password)}},
+            )
+            logger.info("Upgraded password hash to bcrypt for user: %s", req.username)
+        except Exception:
+            logger.warning("Failed to upgrade password hash for user: %s", req.username)
+    return {"access_token": create_token(req.username, role), "role": role, "username": req.username}
+
+
+@router.post("/auth/register")
+async def register(req: RegisterRequest):
+    if not req.username or not req.password:
+        raise HTTPException(400, "Имя пользователя и пароль не могут быть пустыми.")
+    # Validate group against admin-created groups
+    group = (req.group or "").strip()
+    if group:
+        valid_groups = [g["name"] for g in get_groups_col().find({}, {"_id": 0, "name": 1})]
+        if group not in valid_groups:
+            raise HTTPException(400, f"Группа '{group}' не существует. Выберите из доступных групп.")
+    col = get_db()
+    try:
+        col.insert_one({"username": req.username, "password": hash_password(req.password), "role": ROLE_STUDENT, "group": group})
+    except DuplicateKeyError:
+        raise HTTPException(409, "Такой пользователь уже существует.")
+    return {"message": "Вы успешно зарегистрировались! Можете войти в систему."}
+
+
+@router.get("/auth/me")
+async def get_me(user=Depends(get_current_user)):
+    return {"username": user["sub"], "role": user["role"]}
+
+
+@router.get("/auth/users")
+async def get_all_users(user=Depends(get_current_user)):
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    col = get_db()
+    return {u["username"]: {"role": u.get("role", ROLE_UNASSIGNED), "group": u.get("group", "")} for u in col.find({}, {"_id": 0, "password": 0})}
+
+
+@router.get("/auth/users/by-role/{role}")
+async def get_users_by_role(role: str, user=Depends(get_current_user)):
+    if user["role"] not in (ROLE_ADMIN, ROLE_TEACHER):
+        raise HTTPException(403, "Недостаточно прав.")
+    col = get_db()
+    return [u["username"] for u in col.find({"role": role}, {"_id": 0, "username": 1})]
+
+
+@router.get("/auth/groups")
+async def get_groups():
+    """Return list of admin-created groups (public - needed for registration)."""
+    return [g["name"] for g in get_groups_col().find({}, {"_id": 0, "name": 1})]
+
+
+@router.get("/auth/users/by-group/{group}")
+async def get_users_by_group(group: str, user=Depends(get_current_user)):
+    col = get_db()
+    return [u["username"] for u in col.find({"group": group}, {"_id": 0, "username": 1})]
+
+
+@router.get("/auth/students")
+async def get_students(user=Depends(get_current_user)):
+    """Returns all students as [{username, group}] objects."""
+    col = get_db()
+    return [
+        {"username": u["username"], "group": u.get("group", "")}
+        for u in col.find({"role": ROLE_STUDENT}, {"_id": 0, "username": 1, "group": 1})
+    ]
+
+
+@router.put("/auth/users/{username}/role")
+async def change_role(username: str, req: ChangeRoleRequest, user=Depends(get_current_user)):
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    if req.role not in (ROLE_ADMIN, ROLE_TEACHER, ROLE_STUDENT, ROLE_UNASSIGNED):
+        raise HTTPException(400, "Недопустимая роль.")
+    col = get_db()
+    result = col.update_one({"username": username}, {"$set": {"role": req.role}})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Пользователь не найден.")
+    return {"message": f"Роль пользователя {username} изменена на {req.role}."}
+
+
+@router.get("/auth/verify")
+async def verify_token_endpoint(user=Depends(get_current_user)):
+    return {"username": user["sub"], "role": user["role"]}
+
+
+@router.delete("/auth/users/{username}")
+async def delete_user(username: str, user=Depends(get_current_user)):
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    col = get_db()
+    target = col.find_one({"username": username})
+    if not target:
+        raise HTTPException(404, "Пользователь не найден.")
+    if target.get("role") == ROLE_ADMIN:
+        raise HTTPException(400, "Нельзя удалить администратора.")
+    col.delete_one({"username": username})
+    logger.info("User '%s' deleted by admin '%s'", username, user["sub"])
+    return {"message": f"Пользователь {username} удалён."}
+
+
+@router.put("/auth/users/{username}/password")
+async def change_password(username: str, req: ChangePasswordRequest, user=Depends(get_current_user)):
+    # Users can change their own password; admins can change anyone's
+    if user["sub"] != username and user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Вы можете менять только свой пароль.")
+    col = get_db()
+    target = col.find_one({"username": username})
+    if not target:
+        raise HTTPException(404, "Пользователь не найден.")
+    if not verify_password(req.old_password, target["password"]):
+        raise HTTPException(400, "Неверный текущий пароль.")
+    col.update_one({"username": username}, {"$set": {"password": hash_password(req.new_password)}})
+    logger.info("Password changed for user '%s'", username)
+    return {"message": "Пароль успешно изменён."}
+
+
+@router.put("/auth/users/{username}/reset-password")
+async def reset_password(username: str, req: ResetPasswordRequest, user=Depends(get_current_user)):
+    """Admin-only: reset a user's password without requiring the old password."""
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    col = get_db()
+    target = col.find_one({"username": username})
+    if not target:
+        raise HTTPException(404, "Пользователь не найден.")
+    col.update_one({"username": username}, {"$set": {"password": hash_password(req.new_password)}})
+    logger.info("Password reset for user '%s' by admin '%s'", username, user["sub"])
+    return {"message": f"Пароль пользователя {username} сброшен."}
+
+
+@router.post("/auth/groups")
+async def create_group(body: GroupBody, user=Depends(get_current_user)):
+    """Admin-only: create a new group."""
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    try:
+        get_groups_col().insert_one({"name": body.name.strip()})
+    except DuplicateKeyError:
+        raise HTTPException(409, f"Группа '{body.name}' уже существует.")
+    logger.info("Group '%s' created by admin '%s'", body.name, user["sub"])
+    return {"message": f"Группа '{body.name}' создана."}
+
+
+@router.delete("/auth/groups/{group_name}")
+async def delete_group(group_name: str, user=Depends(get_current_user)):
+    """Admin-only: delete a group."""
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    result = get_groups_col().delete_one({"name": group_name})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Группа не найдена.")
+    logger.info("Group '%s' deleted by admin '%s'", group_name, user["sub"])
+    return {"message": f"Группа '{group_name}' удалена."}
