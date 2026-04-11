@@ -23,11 +23,12 @@ RUN pip install --no-cache-dir \
     && find /usr/local/lib/python3.11 -name "*.pyc" -delete \
     && find /usr/local/lib/python3.11 -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
-# Copy config files
+# Copy config files and fix Windows CRLF -> Unix LF
 COPY nginx.conf       /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisord.conf
 COPY start.sh         /start.sh
-RUN chmod +x /start.sh
+RUN sed -i 's/\r$//' /etc/nginx/nginx.conf /etc/supervisord.conf /start.sh \
+    && chmod +x /start.sh
 
 # $PORT is injected by Render at runtime; default to 8000
 EXPOSE 8000
