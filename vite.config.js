@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/TestingExpertSystem/',
+  base: '/Expert_system_backend/',
   server: {
     port: 3000,
     proxy: {
