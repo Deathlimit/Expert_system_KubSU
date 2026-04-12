@@ -123,6 +123,19 @@ function TestTakingContent() {
       setResults(res.data.results);
       clearSessionState(user.username);
       toast('Время вышло. Тест завершён автоматически.', 'error');
+    } else {
+      // Session may have already been finished server-side; check status
+      const status = await api.getSessionStatus(sessionId);
+      if (status.ok && status.data?.results) {
+        setFinished(true);
+        setResults(status.data.results);
+        clearSessionState(user.username);
+        toast('Время вышло. Тест завершён автоматически.', 'error');
+      } else {
+        clearSessionState(user.username);
+        toast('Время вышло. Не удалось получить результат.', 'error');
+        navigate('/student');
+      }
     }
   };
 

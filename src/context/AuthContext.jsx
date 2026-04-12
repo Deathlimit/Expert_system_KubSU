@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import * as api from '../api';
 
 const AuthContext = createContext(null);
@@ -8,6 +8,12 @@ export function AuthProvider({ children }) {
     const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
   });
+
+  useEffect(() => {
+    const handleExpired = () => setUser(null);
+    window.addEventListener('auth-expired', handleExpired);
+    return () => window.removeEventListener('auth-expired', handleExpired);
+  }, []);
 
   const loginUser = useCallback(async (username, password) => {
     const res = await api.login(username, password);

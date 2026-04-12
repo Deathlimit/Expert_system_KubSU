@@ -18,7 +18,17 @@ async function request(method, url, body = null) {
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
   };
   if (body !== null) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch (err) {
+    return { ok: false, status: 0, data: { detail: 'Нет соединения с сервером' } };
+  }
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.dispatchEvent(new Event('auth-expired'));
+  }
   const text = await res.text();
   let data = null;
   try {
