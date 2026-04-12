@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: '/Expert_system_backend/',
+  base: mode === 'production' ? '/Expert_system_backend/' : '/',
   server: {
     port: 3000,
     proxy: {
@@ -13,4 +13,4 @@ export default defineConfig({
       '/sessions': 'https://expert-system-431h.onrender.com',
     },
   },
-});
+}));
