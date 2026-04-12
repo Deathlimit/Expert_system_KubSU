@@ -15,11 +15,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _strip_correct(t: dict) -> dict:
+    """Remove 'correct' key from each question in a test dict (for student views)."""
+    if "questions" in t:
+        t = dict(t)
+        t["questions"] = [{k: v for k, v in q.items() if k != "correct"} for q in t["questions"]]
+    return t
+
+
 @router.get("/tests")
 async def list_tests(user=Depends(get_current_user)):
     if user["role"] == "student":
         # Students should only see tests assigned to them
-        return [clean(t) for t in get_col().find({"assigned_students": user["sub"]}, {"_id": 0})]
+        return [_strip_correct(clean(t)) for t in get_col().find({"assigned_students": user["sub"]}, {"_id": 0})]
     return [clean(t) for t in get_col().find({}, {"_id": 0})]
 
 
@@ -31,10 +39,11 @@ async def list_tests_by_creator(username: str, user=Depends(get_current_user)):
 @router.get("/tests/assigned/{student_username}")
 async def get_assigned_tests(student_username: str, user=Depends(get_current_user)):
     """Return assigned tests grouped by teacher."""
+    is_student = user["role"] == "student"
     result: dict = {}
     for t in get_col().find({"assigned_students": student_username}, {"_id": 0}):
         creator = t.get("creator_username", "Неизвестный преподаватель")
-        result.setdefault(creator, []).append(t)
+        result.setdefault(creator, []).append(_strip_correct(t) if is_student else t)
     for teacher in result:
         result[teacher].sort(key=lambda x: x.get("test_name", ""))
     return result

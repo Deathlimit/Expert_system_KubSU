@@ -55,9 +55,11 @@ class TestSession:
     def _normalize_questions(self) -> None:
         """Normalize different question key formats to a common internal format and shuffle options."""
         for q in self.questions:
-            # Normalize question text: question_text -> question
+            # Normalize question text: question_text / text -> question
             if "question" not in q and "question_text" in q:
                 q["question"] = q["question_text"]
+            if "question" not in q and "text" in q:
+                q["question"] = q["text"]
             # Normalize correct answer: correct_answer -> correct
             if "correct" not in q and "correct_answer" in q:
                 q["correct"] = q["correct_answer"]

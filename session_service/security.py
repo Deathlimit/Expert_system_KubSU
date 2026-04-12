@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import HTTPException, Header
@@ -20,3 +21,18 @@ async def get_current_user(authorization: str = Header(...)):
 
 def auth_header(authorization: str) -> dict:
     return {"Authorization": authorization}
+
+
+def service_auth_header() -> dict:
+    """Generate a service-level JWT for internal service-to-service calls.
+
+    This ensures the test service returns full data (including correct answers)
+    instead of stripping them as it does for student tokens.
+    """
+    payload = {
+        "sub": "__service__session",
+        "role": "teacher",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return {"Authorization": f"Bearer {token}"}

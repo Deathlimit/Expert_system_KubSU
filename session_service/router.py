@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from pymongo import DESCENDING
 
 from database import get_col, CONTENT_SERVICE_URL, TEST_SERVICE_URL
-from security import get_current_user, auth_header
+from security import get_current_user, auth_header, service_auth_header
 from models import StartSessionBody, SubmitAnswerBody
 from session import TestSession
 
@@ -37,10 +37,11 @@ async def start_session(
     async with httpx.AsyncClient(timeout=10.0) as client:
         if body.test_id:
             # Fetch test data first (needed for eligibility check + session creation)
+            # Use service token so test_service returns full data (with correct answers)
             try:
                 resp_test = await client.get(
                     f"{TEST_SERVICE_URL}/tests/{body.test_id}",
-                    headers=auth_header(authorization),
+                    headers=service_auth_header(),
                 )
             except httpx.RequestError as e:
                 logger.error("Failed to reach test service: %s", e)
@@ -231,7 +232,7 @@ async def check_eligibility(
         async with httpx.AsyncClient(timeout=5.0) as client:
             r = await client.get(
                 f"{TEST_SERVICE_URL}/tests/{test_id}",
-                headers=auth_header(authorization),
+                headers=service_auth_header(),
             )
             if r.status_code == 200:
                 test_data = r.json()
