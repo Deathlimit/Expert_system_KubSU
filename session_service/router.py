@@ -49,6 +49,11 @@ async def start_session(
                 raise HTTPException(502, "Не удалось получить данные теста.")
             test_data = resp_test.json()
 
+            # Verify student is assigned to this test
+            assigned = test_data.get("assigned_students", [])
+            if user["role"] == "student" and username not in assigned:
+                raise HTTPException(403, "Вы не назначены на этот тест.")
+
             is_eligible, elig_msg = _check_eligibility_internal(username, body.test_id, test_data)
             if not is_eligible:
                 raise HTTPException(403, elig_msg)
@@ -194,12 +199,17 @@ async def get_test_aggregate_stats(test_id: str, user=Depends(get_current_user))
 
 @router.get("/sessions/history")
 async def get_all_history(user=Depends(get_current_user)):
+    if user["role"] not in ("teacher", "admin"):
+        raise HTTPException(403, "Недостаточно прав.")
     col = get_col()
     return [{k: v for k, v in r.items() if k != "_id"} for r in col.find().sort("start_time", DESCENDING)]
 
 
 @router.get("/sessions/history/{username}")
 async def get_user_history(username: str, user=Depends(get_current_user)):
+    # Students can only view their own history
+    if user["role"] == "student" and user["sub"] != username:
+        raise HTTPException(403, "Нет доступа к истории другого пользователя.")
     col = get_col()
     records = [{k: v for k, v in r.items() if k != "_id"} for r in col.find({"username": username})]
     return _process_history(records)

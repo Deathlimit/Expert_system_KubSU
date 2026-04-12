@@ -23,18 +23,6 @@ async def get_categories(user=Depends(get_current_user)):
     return get_db()["questions"].distinct("topic")
 
 
-@router.post("/content/questions/{topic}")
-async def add_question(topic: str, body: QuestionBody, user=Depends(get_current_user)):
-    if user["role"] not in ("teacher", "admin"):
-        raise HTTPException(403, "Недостаточно прав.")
-    q = body.model_dump(exclude_none=True)
-    q.pop("category", None)
-    q["topic"] = topic
-    get_db()["questions"].insert_one(q)
-    logger.info("Question added to topic '%s' by %s", topic, user["sub"])
-    return {"message": "Вопрос добавлен."}
-
-
 @router.post("/content/questions/import")
 async def bulk_import_questions(body: BulkImportBody, user=Depends(get_current_user)):
     """Import multiple questions at once. Each question dict must have 'topic', 'question', 'options', 'correct'."""
@@ -71,6 +59,18 @@ async def bulk_import_questions(body: BulkImportBody, user=Depends(get_current_u
     if errors:
         result["errors"] = errors
     return result
+
+
+@router.post("/content/questions/{topic}")
+async def add_question(topic: str, body: QuestionBody, user=Depends(get_current_user)):
+    if user["role"] not in ("teacher", "admin"):
+        raise HTTPException(403, "Недостаточно прав.")
+    q = body.model_dump(exclude_none=True)
+    q.pop("category", None)
+    q["topic"] = topic
+    get_db()["questions"].insert_one(q)
+    logger.info("Question added to topic '%s' by %s", topic, user["sub"])
+    return {"message": "Вопрос добавлен."}
 
 
 @router.put("/content/questions/{topic}/{index}")
@@ -121,7 +121,8 @@ async def get_criteria_for_editing(
     user=Depends(get_current_user),
 ):
     db = get_db()
-    key = DEFAULT_CRITERIA_KEY if role == "admin" else username
+    effective_role = user["role"]
+    key = DEFAULT_CRITERIA_KEY if effective_role == "admin" else username
     c = get_criteria(db, key)
     return c if c else copy.deepcopy(DEFAULT_GRADING_CRITERIA)
 
@@ -136,7 +137,8 @@ async def save_criteria(
     if user["role"] not in ("teacher", "admin"):
         raise HTTPException(403, "Недостаточно прав.")
     db = get_db()
-    key = DEFAULT_CRITERIA_KEY if role == "admin" else username
+    effective_role = user["role"]
+    key = DEFAULT_CRITERIA_KEY if effective_role == "admin" else username
     db["criteria"].update_one(
         {"key": key},
         {"$set": {"key": key, "topic_criteria": body.topic_criteria}},
@@ -182,6 +184,8 @@ async def save_test_criteria(
 @router.delete("/content/criteria/test/{test_id}")
 async def delete_test_criteria(test_id: str, user=Depends(get_current_user)):
     """Remove per-test criteria. Called automatically when a test is deleted."""
+    if user["role"] not in ("teacher", "admin"):
+        raise HTTPException(403, "Недостаточно прав.")
     db = get_db()
     key = f"test::{test_id}"
     db["criteria"].delete_one({"key": key})

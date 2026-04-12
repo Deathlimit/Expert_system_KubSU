@@ -17,6 +17,9 @@ router = APIRouter()
 
 @router.get("/tests")
 async def list_tests(user=Depends(get_current_user)):
+    if user["role"] == "student":
+        # Students should only see tests assigned to them
+        return [clean(t) for t in get_col().find({"assigned_students": user["sub"]}, {"_id": 0})]
     return [clean(t) for t in get_col().find({}, {"_id": 0})]
 
 
@@ -42,6 +45,14 @@ async def get_test(test_id: str, user=Depends(get_current_user)):
     t = get_col().find_one({"test_id": test_id}, {"_id": 0})
     if not t:
         raise HTTPException(404, "Тест не найден.")
+    # Hide correct answers from students
+    if user["role"] == "student":
+        t = dict(t)
+        if "questions" in t:
+            t["questions"] = [
+                {k: v for k, v in q.items() if k != "correct"}
+                for q in t["questions"]
+            ]
     return t
 
 

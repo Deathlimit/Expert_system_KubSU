@@ -13,6 +13,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+@router.post("/auth/setup")
+async def setup_first_admin(req: LoginRequest):
+    """Create the first admin user. Only works when no admin exists in the database."""
+    col = get_db()
+    if col.find_one({"role": ROLE_ADMIN}):
+        raise HTTPException(403, "Администратор уже существует.")
+    try:
+        col.insert_one({
+            "username": req.username,
+            "password": hash_password(req.password),
+            "role": ROLE_ADMIN,
+            "group": "",
+        })
+    except DuplicateKeyError:
+        # User exists but is not admin — promote them
+        col.update_one({"username": req.username}, {"$set": {"role": ROLE_ADMIN, "password": hash_password(req.password)}})
+    logger.info("First admin '%s' created via /auth/setup", req.username)
+    return {"message": f"Администратор '{req.username}' создан. Войдите в систему."}
+
+
 # Simple in-memory rate limiter for login endpoint
 _login_attempts: dict = defaultdict(list)
 _RATE_LIMIT_WINDOW = 60  # seconds
