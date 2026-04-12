@@ -24,10 +24,11 @@ export default function LoginPage() {
     }
   }, [isRegister]);
 
-  if (user) {
-    navigate('/');
-    return null;
-  }
+  useEffect(() => {
+    if (user) navigate('/');
+  }, [user, navigate]);
+
+  if (user) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

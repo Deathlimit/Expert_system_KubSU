@@ -10,6 +10,9 @@ export default function GenerateTest() {
   const [maxScore, setMaxScore] = useState(20);
   const [generated, setGenerated] = useState(null);
   const [testName, setTestName] = useState('');
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState('');
+  const [cooldownHours, setCooldownHours] = useState('');
+  const [maxAttempts, setMaxAttempts] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -39,7 +42,13 @@ export default function GenerateTest() {
     if (!testName.trim()) { toast('Введите название', 'error'); return; }
     if (!generated?.questions) return;
     setSaving(true);
-    const res = await api.createTest(testName.trim(), generated.questions);
+    const res = await api.createTest(
+      testName.trim(),
+      generated.questions,
+      timeLimitMinutes ? +timeLimitMinutes : undefined,
+      cooldownHours !== '' ? +cooldownHours : undefined,
+      maxAttempts ? +maxAttempts : undefined,
+    );
     setSaving(false);
     if (res.ok) {
       toast('Тест сохранён!', 'success');
@@ -96,6 +105,18 @@ export default function GenerateTest() {
             <div className="form-group">
               <label className="form-label">Название теста</label>
               <input className="input" value={testName} onChange={e => setTestName(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Ограничение по времени (мин, необязательно)</label>
+              <input type="number" className="input" style={{ width: 120 }} min={1} value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(e.target.value)} placeholder="—" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Кулдаун между попытками (часов)</label>
+              <input type="number" className="input" style={{ width: 120 }} min={0} value={cooldownHours} onChange={e => setCooldownHours(e.target.value)} placeholder="24" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Максимум попыток (необязательно)</label>
+              <input type="number" className="input" style={{ width: 120 }} min={1} value={maxAttempts} onChange={e => setMaxAttempts(e.target.value)} placeholder="—" />
             </div>
             <button className="btn btn-primary" disabled={saving} onClick={handleSave}>
               <FiSave size={16} /> {saving ? 'Сохранение...' : 'Сохранить тест'}

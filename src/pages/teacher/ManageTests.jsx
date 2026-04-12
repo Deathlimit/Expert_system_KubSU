@@ -585,7 +585,8 @@ function HistoryTab() {
             <div className="mt-2">
               <h4 style={{ marginBottom: '.5rem' }}>Ответы</h4>
               {detailResult.answers.map((a, i) => {
-                const correct = JSON.stringify(a.user_answer) === JSON.stringify(a.correct_answer);
+                const normalize = v => Array.isArray(v) ? JSON.stringify([...v].sort()) : JSON.stringify(v);
+                const correct = normalize(a.user_answer) === normalize(a.correct_answer);
                 return (
                   <div key={i} style={{ padding: '.5rem', marginBottom: '.25rem', borderRadius: 6, background: correct ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)' }}>
                     <div style={{ fontWeight: 600, fontSize: '.85rem' }}>{i + 1}. {a.question}</div>

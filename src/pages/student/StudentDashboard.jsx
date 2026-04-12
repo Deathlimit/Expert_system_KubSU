@@ -83,8 +83,8 @@ function StudentContent() {
 
   const sidebarLinks = [
     { label: 'Меню', items: [
-      { id: 'tests', text: 'Назначенные тесты', icon: <FiList size={18} />, onClick: () => setTab('tests'), path: '/student' },
-      { id: 'history', text: 'Моя история', icon: <FiBookOpen size={18} />, onClick: () => setTab('history') },
+      { id: 'tests', text: 'Назначенные тесты', icon: <FiList size={18} />, onClick: () => setTab('tests'), active: tab === 'tests' },
+      { id: 'history', text: 'Моя история', icon: <FiBookOpen size={18} />, onClick: () => setTab('history'), active: tab === 'history' },
     ]}
   ];
 

@@ -423,7 +423,7 @@ tr:hover td { background: var(--table-hover); }
   transition: all var(--transition);
 }
 .tab:hover { color: var(--text); }
-.tab.active {
+.tab.tab-active {
   color: var(--bg-accent);
   border-bottom-color: var(--bg-accent);
 }

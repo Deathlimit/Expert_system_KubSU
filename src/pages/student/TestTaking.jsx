@@ -96,16 +96,16 @@ function TestTakingContent() {
 
   /* ── Timer ── */
   useEffect(() => {
-    if (secondsRemaining != null && secondsRemaining > 0) {
+    if (secondsRemaining != null && secondsRemaining > 0 && !timerRef.current) {
       timerRef.current = setInterval(() => {
         setSecondsRemaining(prev => {
-          if (prev <= 1) { clearInterval(timerRef.current); return 0; }
+          if (prev <= 1) { clearInterval(timerRef.current); timerRef.current = null; return 0; }
           return prev - 1;
         });
       }, 1000);
     }
-    return () => clearInterval(timerRef.current);
-  }, [sessionId]);
+    return () => { clearInterval(timerRef.current); timerRef.current = null; };
+  }, [sessionId, secondsRemaining]);
 
   /* ── Auto-submit on timeout (like desktop) ── */
   useEffect(() => {

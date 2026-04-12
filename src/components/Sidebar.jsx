@@ -33,7 +33,7 @@ export default function Sidebar({ links }) {
           {section.items.map((item) => (
             <button
               key={item.path || item.id}
-              className={`sidebar-link ${item.path && location.pathname.startsWith(item.path) ? 'active' : ''}`}
+              className={`sidebar-link ${item.active != null ? (item.active ? 'active' : '') : (item.path && location.pathname.startsWith(item.path) ? 'active' : '')}`}
               onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
             >
               {item.icon} {item.text}
