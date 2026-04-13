@@ -7,12 +7,6 @@ import { ToastProvider, useToast } from '../../components/Toast';
 import * as api from '../../api';
 import { FiPlay, FiClock, FiBookOpen, FiList, FiRefreshCw } from 'react-icons/fi';
 
-/* ── localStorage helpers for detecting active session ── */
-const SAVE_KEY_PREFIX = 'tes_active_session_';
-function getActiveSession(username) {
-  try { const raw = localStorage.getItem(SAVE_KEY_PREFIX + username); return raw ? JSON.parse(raw) : null; } catch { return null; }
-}
-
 function StudentContent() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -27,10 +21,19 @@ function StudentContent() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    // Check for active session in localStorage
-    const saved = getActiveSession(user.username);
-    if (saved && saved.test_id) setActiveSession(saved);
-    else setActiveSession(null);
+    // Check for active session on server
+    const activeRes = await api.getActiveSession();
+    if (activeRes.ok && activeRes.data?.active) {
+      setActiveSession({
+        session_id: activeRes.data.session_id,
+        test_id: activeRes.data.test_id,
+        test_name: activeRes.data.test_name,
+        frontier_idx: activeRes.data.current_question_index,
+        total_questions: activeRes.data.total_questions,
+      });
+    } else {
+      setActiveSession(null);
+    }
 
     const res = await api.getAssignedTests(user.username);
     if (res.ok) {

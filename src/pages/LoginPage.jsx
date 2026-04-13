@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [group, setGroup] = useState('');
   const [groups, setGroups] = useState([]);
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ export default function LoginPage() {
     setLoading(true);
 
     if (isRegister) {
-      const res = await registerUser(username, password, group);
+      const res = await registerUser(username, password, group, fullName);
       setLoading(false);
       if (res.ok) {
         setSuccess(res.message + ' Теперь войдите.');
@@ -72,8 +73,14 @@ export default function LoginPage() {
         {success && <div className="toast toast-success" style={{ marginBottom: 16 }}>{success}</div>}
 
         <form className="login-form" onSubmit={handleSubmit}>
+          {isRegister && (
+            <div className="form-group">
+              <label className="form-label">ФИО</label>
+              <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Иванов Иван Иванович" />
+            </div>
+          )}
           <div className="form-group">
-            <label className="form-label">Имя пользователя</label>
+            <label className="form-label">Логин</label>
             <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} required autoFocus />
           </div>
           <div className="form-group">

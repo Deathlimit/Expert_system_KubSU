@@ -7,12 +7,6 @@ import { FiChevronLeft, FiChevronRight, FiCheck, FiClock, FiArrowLeft } from 're
 
 /* ── localStorage helpers for session persistence ── */
 const SAVE_KEY_PREFIX = 'tes_active_session_';
-function saveSessionState(username, state) {
-  try { localStorage.setItem(SAVE_KEY_PREFIX + username, JSON.stringify(state)); } catch {}
-}
-function loadSessionState(username) {
-  try { const raw = localStorage.getItem(SAVE_KEY_PREFIX + username); return raw ? JSON.parse(raw) : null; } catch { return null; }
-}
 function clearSessionState(username) {
   try { localStorage.removeItem(SAVE_KEY_PREFIX + username); } catch {}
 }
@@ -33,6 +27,7 @@ function TestTakingContent() {
   const [submitting, setSubmitting] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(null);
   const timerRef = useRef(null);
+  const startingRef = useRef(false); // guard against double-fire (React StrictMode)
 
   /* ── Navigation / review state (like desktop) ── */
   const [qBuffer, setQBuffer] = useState([]);       // list of question dicts from API
@@ -43,53 +38,55 @@ function TestTakingContent() {
 
   /* ── Start or resume test ── */
   const startTest = useCallback(async () => {
+    if (startingRef.current) return; // prevent double-fire
+    startingRef.current = true;
     setLoading(true);
-    // Try to resume a saved session
-    const saved = loadSessionState(user.username);
-    if (saved && saved.test_id === testId && saved.session_id) {
-      const status = await api.getSessionStatus(saved.session_id);
-      if (status.ok && status.data?.current_index === saved.frontier_idx) {
-        // Restore session
-        setSessionId(saved.session_id);
-        setQBuffer(saved.q_buffer || []);
-        setABuffer(saved.a_buffer || []);
-        setFrontierIdx(saved.frontier_idx);
-        setTotalQuestions(saved.total_questions || 0);
-        const fq = (saved.q_buffer || [])[saved.frontier_idx];
-        if (fq) {
-          setQuestion(fq);
-          setCurrentNavIdx(saved.frontier_idx);
-          if (fq.seconds_remaining != null) setSecondsRemaining(fq.seconds_remaining);
-        }
-        setLoading(false);
-        return;
-      } else {
-        clearSessionState(user.username);
-      }
-    }
 
+    // Call startSession — server will resume existing session or create new one
     const res = await api.startSession(testId);
     if (res.ok) {
+      // Check if server auto-finished an expired session
+      if (res.data.finished && res.data.timed_out) {
+        setFinished(true);
+        setResults(res.data.results);
+        clearSessionState(user.username);
+        toast('Время вышло. Тест завершён автоматически.', 'error');
+        setLoading(false);
+        return;
+      }
+
       const sid = res.data.session_id;
       const total = res.data.total_questions || res.data.current_question?.total_questions || 0;
       const q = res.data.current_question;
+
       setSessionId(sid);
       setTotalQuestions(total);
-      setQBuffer([q]);
-      setABuffer([]);
-      setFrontierIdx(0);
-      setCurrentNavIdx(0);
-      applyQuestion(q);
-      // Save initial state
-      saveSessionState(user.username, {
-        session_id: sid, test_id: testId, total_questions: total,
-        frontier_idx: 0, q_buffer: [q], a_buffer: [],
-      });
+
+      if (res.data.resumed && res.data.past_questions?.length > 0) {
+        // Resuming: rebuild buffers from server data
+        const pastQs = res.data.past_questions || [];
+        const pastAs = res.data.past_answers || [];
+        const allQs = [...pastQs, q];
+        const frontier = allQs.length - 1;
+        setQBuffer(allQs);
+        setABuffer(pastAs);
+        setFrontierIdx(frontier);
+        setCurrentNavIdx(frontier);
+        applyQuestion(q);
+      } else {
+        // Fresh start
+        setQBuffer([q]);
+        setABuffer([]);
+        setFrontierIdx(0);
+        setCurrentNavIdx(0);
+        applyQuestion(q);
+      }
     } else {
       toast(res.data?.detail || 'Не удалось начать тест', 'error');
       navigate('/student');
     }
     setLoading(false);
+    startingRef.current = false;
   }, [testId, user.username]);
 
   useEffect(() => { startTest(); }, [startTest]);
@@ -192,11 +189,6 @@ function TestTakingContent() {
         setCurrentNavIdx(newFrontier);
         setQuestion(nextQ);
         applyQuestion(nextQ);
-        // Save intermediate state
-        saveSessionState(user.username, {
-          session_id: sessionId, test_id: testId, total_questions: totalQuestions,
-          frontier_idx: newFrontier, q_buffer: newQBuffer, a_buffer: newABuffer,
-        });
       }
     } else {
       toast(res.data?.detail || 'Ошибка при отправке ответа', 'error');

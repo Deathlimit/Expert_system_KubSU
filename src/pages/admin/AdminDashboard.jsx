@@ -75,6 +75,7 @@ function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pwdModal, setPwdModal] = useState(null);
+  const [fnModal, setFnModal] = useState(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -107,7 +108,15 @@ function UserManagement() {
   };
 
   const columns = [
-    { key: 'username', label: 'Имя пользователя' },
+    { key: 'username', label: 'Логин' },
+    { key: 'full_name', label: 'ФИО', render: (v, row) => (
+      <div className="flex items-center gap-xs">
+        <span>{v || '—'}</span>
+        <button className="btn btn-ghost btn-sm" title="Изменить ФИО" onClick={() => setFnModal(row)}>
+          <FiEdit size={12} />
+        </button>
+      </div>
+    )},
     { key: 'role', label: 'Роль', render: (v, row) => {
       const isAdmin = v === 'admin';
       return (
@@ -140,6 +149,7 @@ function UserManagement() {
         <SortableTable columns={columns} data={users} emptyText="Нет пользователей" />
       </div>
       {pwdModal && <ChangePasswordModal username={pwdModal} onClose={() => setPwdModal(null)} />}
+      {fnModal && <EditFullNameModal username={fnModal.username} currentName={fnModal.full_name || ''} onClose={() => setFnModal(null)} onSaved={loadUsers} />}
     </>
   );
 }
@@ -164,6 +174,29 @@ function ChangePasswordModal({ username, onClose }) {
       <div className="flex flex-col gap-sm">
         <input className="input" type="password" placeholder="Новый пароль (мин. 6 символов)" value={newPwd} onChange={e => setNewPwd(e.target.value)} />
         <button className="btn btn-primary" disabled={saving} onClick={handleSave}>Сбросить пароль</button>
+      </div>
+    </Modal>
+  );
+}
+
+function EditFullNameModal({ username, currentName, onClose, onSaved }) {
+  const toast = useToast();
+  const [fullName, setFullName] = useState(currentName);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const res = await api.updateUserFullName(username, fullName.trim());
+    setSaving(false);
+    if (res.ok) { toast('ФИО обновлено', 'success'); onSaved(); onClose(); }
+    else toast(res.data?.detail || 'Ошибка', 'error');
+  };
+
+  return (
+    <Modal title={`ФИО: ${username}`} onClose={onClose}>
+      <div className="flex flex-col gap-sm">
+        <input className="input" placeholder="Фамилия Имя Отчество" value={fullName} onChange={e => setFullName(e.target.value)} autoFocus />
+        <button className="btn btn-primary" disabled={saving} onClick={handleSave}>Сохранить</button>
       </div>
     </Modal>
   );

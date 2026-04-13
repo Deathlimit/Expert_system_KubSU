@@ -58,9 +58,9 @@ export default function Sidebar({ links }) {
       </button>
 
       <div className="sidebar-user">
-        <div className="sidebar-user-avatar">{user?.username?.[0]?.toUpperCase()}</div>
+        <div className="sidebar-user-avatar">{(user?.full_name || user?.username)?.[0]?.toUpperCase()}</div>
         <div className="sidebar-user-info">
-          <div className="sidebar-user-name">{user?.username}</div>
+          <div className="sidebar-user-name">{user?.full_name || user?.username}</div>
           <div className="sidebar-user-role">{roleLabels[user?.role] || user?.role}</div>
         </div>
       </div>

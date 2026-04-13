@@ -10,17 +10,35 @@ export function AuthProvider({ children }) {
   });
 
   useEffect(() => {
-    const handleExpired = () => setUser(null);
+    const handleExpired = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    };
     window.addEventListener('auth-expired', handleExpired);
     return () => window.removeEventListener('auth-expired', handleExpired);
+  }, []);
+
+  // Verify token on mount (detects password changes / invalidation)
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token && user) {
+      api.verifyToken().then(res => {
+        if (!res.ok) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      });
+    }
   }, []);
 
   const loginUser = useCallback(async (username, password) => {
     const res = await api.login(username, password);
     if (res.ok) {
-      const { access_token, role, username: uname } = res.data;
+      const { access_token, role, username: uname, full_name } = res.data;
       localStorage.setItem('token', access_token);
-      const u = { username: uname, role };
+      const u = { username: uname, role, full_name: full_name || '' };
       localStorage.setItem('user', JSON.stringify(u));
       setUser(u);
       return { ok: true };
@@ -32,8 +50,8 @@ export function AuthProvider({ children }) {
     return { ok: false, message };
   }, []);
 
-  const registerUser = useCallback(async (username, password, group) => {
-    const res = await api.register(username, password, group);
+  const registerUser = useCallback(async (username, password, group, fullName) => {
+    const res = await api.register(username, password, group, fullName);
     if (res.ok) return { ok: true, message: res.data?.message || 'Регистрация успешна' };
     const detail = res.data?.detail;
     const message = Array.isArray(detail)

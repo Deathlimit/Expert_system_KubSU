@@ -5,7 +5,7 @@ import SortableTable from '../../components/SortableTable';
 import Modal from '../../components/Modal';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import * as api from '../../api';
-import { FiTrash2, FiPlus, FiUsers, FiBarChart2, FiDownload, FiSearch, FiSliders, FiCopy, FiEdit2 } from 'react-icons/fi';
+import { FiTrash2, FiPlus, FiUsers, FiBarChart2, FiDownload, FiSearch, FiSliders, FiCopy, FiEdit2, FiSettings } from 'react-icons/fi';
 
 export default function ManageTests() {
   const [tab, setTab] = useState('manage');
@@ -37,6 +37,7 @@ function ManageTab() {
   const [showAddQ, setShowAddQ] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showCriteria, setShowCriteria] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const loadTests = useCallback(async () => {
     setLoading(true);
@@ -179,6 +180,7 @@ function ManageTab() {
               <h2 style={{ fontSize: '1.1rem' }}>{selectedTest.test_name}</h2>
               <div className="flex gap-xs">
                 <button className="btn btn-secondary btn-sm" onClick={handleRenameTest}><FiEdit2 size={14} /> Переименовать</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)}><FiSettings size={14} /> Настройки</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowStats(true)}><FiBarChart2 size={14} /> Статистика</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowCriteria(true)}><FiSliders size={14} /> Критерии</button>
                 <button className="btn btn-secondary btn-sm" onClick={handleCloneTest}><FiCopy size={14} /> Клон</button>
@@ -186,8 +188,10 @@ function ManageTab() {
               </div>
             </div>
             <div className="text-sm text-secondary mb-2">
-              Создатель: {selectedTest.creator_username} • Дата: {selectedTest.creation_date || '—'}
-              {selectedTest.time_limit_minutes ? ` • ${selectedTest.time_limit_minutes} мин` : ''}
+              Создатель: {selectedTest.creator_full_name || selectedTest.creator_username} • Дата: {selectedTest.creation_date || '—'}
+              {selectedTest.time_limit_minutes ? ` • ${selectedTest.time_limit_minutes} мин` : ' • Без ограничения времени'}
+              {' • Кулдаун: '}{selectedTest.cooldown_hours != null ? `${selectedTest.cooldown_hours} ч` : '24 ч'}
+              {selectedTest.max_attempts ? ` • Попыток: ${selectedTest.max_attempts}` : ' • Попытки: ∞'}
             </div>
 
             {/* Questions in test */}
@@ -219,7 +223,7 @@ function ManageTab() {
               {filteredStudents.map(s => (
                 <label key={s.username} className="flex items-center gap-xs" style={{ padding: '4px 0' }}>
                   <input type="checkbox" checked={localAssigned.has(s.username)} onChange={() => toggleStudent(s.username)} />
-                  <span>{s.username}</span>
+                  <span>{s.full_name || s.username}</span>
                   {s.group && <span className="badge badge-neutral text-xs">{s.group}</span>}
                 </label>
               ))}
@@ -249,6 +253,11 @@ function ManageTab() {
       {/* Criteria modal */}
       {showCriteria && selectedTest && (
         <TestCriteriaModal testId={selectedTest.test_id} onClose={() => setShowCriteria(false)} />
+      )}
+
+      {/* Settings modal */}
+      {showSettings && selectedTest && (
+        <TestSettingsModal test={selectedTest} onClose={() => setShowSettings(false)} onSaved={loadTests} />
       )}
     </div>
   );
@@ -326,6 +335,7 @@ function StatisticsModal({ testId, testName, onClose }) {
   const [groupFilter, setGroupFilter] = useState('');
   const [groups, setGroups] = useState([]);
   const [studentsByGroup, setStudentsByGroup] = useState({});
+  const [nameMap, setNameMap] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -340,13 +350,16 @@ function StatisticsModal({ testId, testName, onClose }) {
       if (gr.ok) setGroups(gr.data || []);
       if (studr.ok) {
         const byGroup = {};
+        const nm = {};
         (studr.data || []).forEach(s => {
+          nm[s.username] = s.full_name || s.username;
           if (s.group) {
             if (!byGroup[s.group]) byGroup[s.group] = new Set();
             byGroup[s.group].add(s.username);
           }
         });
         setStudentsByGroup(byGroup);
+        setNameMap(nm);
       }
       setLoading(false);
     });
@@ -355,7 +368,7 @@ function StatisticsModal({ testId, testName, onClose }) {
   const groupStudents = groupFilter ? (studentsByGroup[groupFilter] || new Set()) : null;
 
   const filtered = results.filter(r =>
-    (!textFilter || (r.username || '').toLowerCase().includes(textFilter.toLowerCase())) &&
+    (!textFilter || (nameMap[r.username] || r.username || '').toLowerCase().includes(textFilter.toLowerCase())) &&
     (!groupStudents || groupStudents.has(r.username))
   );
 
@@ -366,7 +379,7 @@ function StatisticsModal({ testId, testName, onClose }) {
     const BOM = '\uFEFF';
     const header = 'Студент;Дата;Длительность;Итог;Статус;Правильных';
     const rows = filtered.map(r =>
-      [r.username, r.start_time, r.duration, r.final_status, r.status, r.score_percentage?.toFixed(1) + '%'].join(';')
+      [nameMap[r.username] || r.username, r.start_time, r.duration, r.final_status, r.status, r.score_percentage?.toFixed(1) + '%'].join(';')
     );
     const csv = BOM + header + '\n' + rows.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -379,7 +392,7 @@ function StatisticsModal({ testId, testName, onClose }) {
   };
 
   const columns = [
-    { key: 'username', label: 'Студент' },
+    { key: 'username', label: 'Студент', render: v => nameMap[v] || v },
     { key: 'start_time', label: 'Дата' },
     { key: 'duration', label: 'Длительность' },
     { key: 'final_status', label: 'Итог', render: v => <span className={`badge ${v === 'Зачёт' || v === 'Passed' ? 'badge-green' : 'badge-red'}`}>{v}</span> },
@@ -488,6 +501,50 @@ function TestCriteriaModal({ testId, onClose }) {
   );
 }
 
+/* ======================== TEST SETTINGS MODAL ======================== */
+function TestSettingsModal({ test, onClose, onSaved }) {
+  const toast = useToast();
+  const [timeLimit, setTimeLimit] = useState(test.time_limit_minutes || 0);
+  const [cooldown, setCooldown] = useState(test.cooldown_hours != null ? test.cooldown_hours : 24);
+  const [maxAttempts, setMaxAttempts] = useState(test.max_attempts || 0);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const res = await api.updateTestSettings(test.test_id, {
+      time_limit_minutes: timeLimit > 0 ? timeLimit : null,
+      cooldown_hours: cooldown,
+      max_attempts: maxAttempts > 0 ? maxAttempts : null,
+    });
+    setSaving(false);
+    if (res.ok) { toast('Настройки сохранены', 'success'); onSaved(); onClose(); }
+    else toast(res.data?.detail || 'Ошибка', 'error');
+  };
+
+  return (
+    <Modal title={`Настройки: ${test.test_name}`} onClose={onClose}>
+      <div className="flex flex-col gap-sm">
+        <div className="form-group">
+          <label className="form-label">Время на прохождение (минуты)</label>
+          <input type="number" className="input" min={0} value={timeLimit} onChange={e => setTimeLimit(+e.target.value)} />
+          <span className="text-xs text-secondary">0 = без ограничения</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Кулдаун между попытками (часы)</label>
+          <input type="number" className="input" min={0} value={cooldown} onChange={e => setCooldown(+e.target.value)} />
+          <span className="text-xs text-secondary">0 = без кулдауна</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Максимальное количество попыток</label>
+          <input type="number" className="input" min={0} value={maxAttempts} onChange={e => setMaxAttempts(+e.target.value)} />
+          <span className="text-xs text-secondary">0 = неограниченно</span>
+        </div>
+        <button className="btn btn-primary" disabled={saving} onClick={handleSave}>Сохранить настройки</button>
+      </div>
+    </Modal>
+  );
+}
+
 /* ======================== HISTORY TAB ======================== */
 function HistoryTab() {
   const toast = useToast();
@@ -498,11 +555,26 @@ function HistoryTab() {
   const [loading, setLoading] = useState(false);
   const [detailResult, setDetailResult] = useState(null);
   const [studentOptions, setStudentOptions] = useState([]);
+  const [studentNameMap, setStudentNameMap] = useState({});
+  const [nameToUsername, setNameToUsername] = useState({});
   const [groupOptions, setGroupOptions] = useState([]);
 
   useEffect(() => {
     Promise.all([api.getStudents(), api.getAllGroups()]).then(([sr, gr]) => {
-      if (sr.ok) setStudentOptions((sr.data || []).map(s => s.username));
+      if (sr.ok) {
+        const nm = {};
+        const n2u = {};
+        const opts = [];
+        (sr.data || []).forEach(s => {
+          const display = s.full_name || s.username;
+          nm[s.username] = display;
+          n2u[display] = s.username;
+          opts.push(display);
+        });
+        setStudentOptions(opts);
+        setStudentNameMap(nm);
+        setNameToUsername(n2u);
+      }
       if (gr.ok) setGroupOptions(gr.data || []);
     });
   }, []);
@@ -513,8 +585,9 @@ function HistoryTab() {
     if (!searchValue.trim()) return;
     setLoading(true);
     if (searchMode === 'student') {
-      const res = await api.getUserHistory(searchValue.trim());
-      if (res.ok) setResults(res.data || []);
+      const username = nameToUsername[searchValue.trim()] || searchValue.trim();
+      const res = await api.getUserHistory(username);
+      if (res.ok) setResults((res.data || []).map(r => ({ ...r, _displayName: studentNameMap[r.username] || r.username })));
       else { toast(res.data?.detail || 'Не найдено', 'error'); setResults([]); }
     } else {
       const gr = await api.getUsersByGroup(searchValue.trim());
@@ -522,7 +595,7 @@ function HistoryTab() {
         const all = [];
         for (const username of gr.data) {
           const r = await api.getUserHistory(username);
-          if (r.ok) all.push(...(r.data || []).map(h => ({ ...h, username })));
+          if (r.ok) all.push(...(r.data || []).map(h => ({ ...h, username, _displayName: studentNameMap[username] || username })));
         }
         setResults(all);
       } else {
@@ -539,7 +612,7 @@ function HistoryTab() {
   );
 
   const columns = [
-    { key: 'username', label: 'Студент' },
+    { key: 'username', label: 'Студент', render: (v, row) => row._displayName || studentNameMap[v] || v },
     { key: 'test_name', label: 'Тест' },
     { key: 'attempt_number', label: 'Попытка' },
     { key: 'start_time', label: 'Дата' },
@@ -576,7 +649,7 @@ function HistoryTab() {
       {detailResult && (
         <Modal title="Детали" onClose={() => setDetailResult(null)}>
           <div className="text-sm">
-            <p><strong>Студент:</strong> {detailResult.username}</p>
+            <p><strong>Студент:</strong> {detailResult._displayName || studentNameMap[detailResult.username] || detailResult.username}</p>
             <p><strong>Тест:</strong> {detailResult.test_name}</p>
             <p><strong>Результат:</strong> {detailResult.final_status} ({detailResult.score_percentage?.toFixed(1)}%)</p>
             <p><strong>Длительность:</strong> {detailResult.duration}</p>

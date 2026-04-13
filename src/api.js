@@ -12,18 +12,42 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+let _wakeUpVisible = false;
+
+function _showWakeUp() {
+  if (!_wakeUpVisible) {
+    _wakeUpVisible = true;
+    window.dispatchEvent(new Event('server-waking-up'));
+  }
+}
+
+function _hideWakeUp() {
+  if (_wakeUpVisible) {
+    _wakeUpVisible = false;
+    window.dispatchEvent(new Event('server-ready'));
+  }
+}
+
 async function request(method, url, body = null) {
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
   };
   if (body !== null) opts.body = JSON.stringify(body);
+
+  const WAKE_DELAY = 5000;
+  const wakeTimer = setTimeout(_showWakeUp, WAKE_DELAY);
+
   let res;
   try {
     res = await fetch(url, opts);
   } catch (err) {
+    clearTimeout(wakeTimer);
+    _hideWakeUp();
     return { ok: false, status: 0, data: { detail: 'Нет соединения с сервером' } };
   }
+  clearTimeout(wakeTimer);
+  _hideWakeUp();
   if (res.status === 401) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -43,9 +67,10 @@ async function request(method, url, body = null) {
 export async function login(username, password) {
   return request('POST', `${AUTH}/login`, { username, password });
 }
-export async function register(username, password, group) {
+export async function register(username, password, group, fullName) {
   const body = { username, password };
   if (group) body.group = group;
+  if (fullName) body.full_name = fullName;
   return request('POST', `${AUTH}/register`, body);
 }
 export async function getAllUsers() {
@@ -74,6 +99,9 @@ export async function changePassword(username, oldPassword, newPassword) {
 }
 export async function resetPassword(username, newPassword) {
   return request('PUT', `${AUTH}/users/${encodeURIComponent(username)}/reset-password`, { new_password: newPassword });
+}
+export async function updateUserFullName(username, fullName) {
+  return request('PUT', `${AUTH}/users/${encodeURIComponent(username)}/full-name`, { full_name: fullName });
 }
 export async function createGroup(name) {
   return request('POST', `${AUTH}/groups`, { name });
@@ -144,6 +172,9 @@ export async function deleteTest(testId) {
 export async function renameTest(testId, testName) {
   return request('PUT', `${TESTS}/${testId}/name`, { test_name: testName });
 }
+export async function updateTestSettings(testId, settings) {
+  return request('PUT', `${TESTS}/${testId}/settings`, settings);
+}
 export async function cloneTest(testId) {
   return request('POST', `${TESTS}/${testId}/clone`);
 }
@@ -175,6 +206,9 @@ export async function submitAnswer(sessionId, answer) {
 export async function getSessionStatus(sessionId) {
   return request('GET', `${SESSIONS}/${sessionId}/status`);
 }
+export async function getActiveSession() {
+  return request('GET', `${SESSIONS}/active`);
+}
 export async function checkEligibility(username, testId) {
   return request('GET', `${SESSIONS}/eligibility/${encodeURIComponent(username)}/${testId}`);
 }
@@ -189,4 +223,7 @@ export async function getTestResults(testId) {
 }
 export async function getTestAggregateStats(testId) {
   return request('GET', `${SESSIONS}/results/test/${testId}/stats`);
+}
+export async function verifyToken() {
+  return request('GET', `${AUTH}/verify`);
 }
