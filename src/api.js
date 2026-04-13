@@ -12,6 +12,10 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+const WAKE_URL = 'https://expert-system-431h.onrender.com/';
+const WAKE_POLL_INTERVAL = 3000;
+const WAKE_DELAY = 5000;
+
 let _wakeUpVisible = false;
 
 function _showWakeUp() {
@@ -28,6 +32,24 @@ function _hideWakeUp() {
   }
 }
 
+function _needsWakeUp(res) {
+  return !res || res.status === 520 || res.status === 502 || res.status === 503;
+}
+
+async function _waitForServer() {
+  _showWakeUp();
+  while (true) {
+    try {
+      const ping = await fetch(WAKE_URL, { method: 'GET' });
+      if (ping.ok) {
+        _hideWakeUp();
+        return;
+      }
+    } catch { /* server still sleeping */ }
+    await new Promise((r) => setTimeout(r, WAKE_POLL_INTERVAL));
+  }
+}
+
 async function request(method, url, body = null) {
   const opts = {
     method,
@@ -35,19 +57,30 @@ async function request(method, url, body = null) {
   };
   if (body !== null) opts.body = JSON.stringify(body);
 
-  const WAKE_DELAY = 5000;
   const wakeTimer = setTimeout(_showWakeUp, WAKE_DELAY);
 
   let res;
   try {
     res = await fetch(url, opts);
-  } catch (err) {
-    clearTimeout(wakeTimer);
-    _hideWakeUp();
-    return { ok: false, status: 0, data: { detail: 'Нет соединения с сервером' } };
+  } catch {
+    res = null;
   }
+
+  if (_needsWakeUp(res)) {
+    clearTimeout(wakeTimer);
+    await _waitForServer();
+    // retry the original request after server woke up
+    try {
+      res = await fetch(url, opts);
+    } catch {
+      _hideWakeUp();
+      return { ok: false, status: 0, data: { detail: 'Нет соединения с сервером' } };
+    }
+  }
+
   clearTimeout(wakeTimer);
   _hideWakeUp();
+
   if (res.status === 401) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
