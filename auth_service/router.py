@@ -5,9 +5,9 @@ from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException
 from pymongo.errors import DuplicateKeyError
 
-from database import get_db, get_groups_col, ROLE_ADMIN, ROLE_TEACHER, ROLE_STUDENT, ROLE_UNASSIGNED
+from database import get_db, get_groups_col, get_tests_col, DEMO_TEST_ID, ROLE_ADMIN, ROLE_TEACHER, ROLE_STUDENT, ROLE_UNASSIGNED
 from security import hash_password, verify_password, create_token, get_current_user
-from models import LoginRequest, RegisterRequest, ChangeRoleRequest, ChangePasswordRequest, ResetPasswordRequest, GroupBody
+from models import LoginRequest, RegisterRequest, ChangeRoleRequest, ChangePasswordRequest, ResetPasswordRequest, GroupBody, UpdateFullNameRequest
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,8 @@ async def setup_first_admin(req: LoginRequest):
             "password": hash_password(req.password),
             "role": ROLE_ADMIN,
             "group": "",
+            "full_name": "",
+            "token_version": 0,
         })
     except DuplicateKeyError:
         # User exists but is not admin — promote them
@@ -66,7 +68,9 @@ async def login(req: LoginRequest):
             logger.info("Upgraded password hash to bcrypt for user: %s", req.username)
         except Exception:
             logger.warning("Failed to upgrade password hash for user: %s", req.username)
-    return {"access_token": create_token(req.username, role), "role": role, "username": req.username}
+    tv = user.get("token_version", 0)
+    full_name = user.get("full_name", "")
+    return {"access_token": create_token(req.username, role, tv), "role": role, "username": req.username, "full_name": full_name}
 
 
 @router.post("/auth/register")
@@ -79,17 +83,35 @@ async def register(req: RegisterRequest):
         valid_groups = [g["name"] for g in get_groups_col().find({}, {"_id": 0, "name": 1})]
         if group not in valid_groups:
             raise HTTPException(400, f"Группа '{group}' не существует. Выберите из доступных групп.")
+    full_name = (req.full_name or "").strip()
     col = get_db()
     try:
-        col.insert_one({"username": req.username, "password": hash_password(req.password), "role": ROLE_STUDENT, "group": group})
+        col.insert_one({
+            "username": req.username,
+            "password": hash_password(req.password),
+            "role": ROLE_STUDENT,
+            "group": group,
+            "full_name": full_name,
+            "token_version": 0,
+        })
     except DuplicateKeyError:
         raise HTTPException(409, "Такой пользователь уже существует.")
+    # Assign demo test to new user
+    try:
+        get_tests_col().update_one(
+            {"test_id": DEMO_TEST_ID},
+            {"$addToSet": {"assigned_students": req.username}},
+        )
+    except Exception:
+        pass  # Don't fail registration if demo test assignment fails
     return {"message": "Вы успешно зарегистрировались! Можете войти в систему."}
 
 
 @router.get("/auth/me")
 async def get_me(user=Depends(get_current_user)):
-    return {"username": user["sub"], "role": user["role"]}
+    col = get_db()
+    db_user = col.find_one({"username": user["sub"]}, {"_id": 0, "full_name": 1})
+    return {"username": user["sub"], "role": user["role"], "full_name": (db_user or {}).get("full_name", "")}
 
 
 @router.get("/auth/users")
@@ -97,7 +119,7 @@ async def get_all_users(user=Depends(get_current_user)):
     if user["role"] != ROLE_ADMIN:
         raise HTTPException(403, "Только для администраторов.")
     col = get_db()
-    return {u["username"]: {"role": u.get("role", ROLE_UNASSIGNED), "group": u.get("group", "")} for u in col.find({}, {"_id": 0, "password": 0})}
+    return {u["username"]: {"role": u.get("role", ROLE_UNASSIGNED), "group": u.get("group", ""), "full_name": u.get("full_name", "")} for u in col.find({}, {"_id": 0, "password": 0, "token_version": 0})}
 
 
 @router.get("/auth/users/by-role/{role}")
@@ -116,6 +138,8 @@ async def get_groups():
 
 @router.get("/auth/users/by-group/{group}")
 async def get_users_by_group(group: str, user=Depends(get_current_user)):
+    if user["role"] not in (ROLE_ADMIN, ROLE_TEACHER):
+        raise HTTPException(403, "Недостаточно прав.")
     col = get_db()
     return [u["username"] for u in col.find({"group": group}, {"_id": 0, "username": 1})]
 
@@ -123,10 +147,12 @@ async def get_users_by_group(group: str, user=Depends(get_current_user)):
 @router.get("/auth/students")
 async def get_students(user=Depends(get_current_user)):
     """Returns all students as [{username, group}] objects."""
+    if user["role"] not in (ROLE_ADMIN, ROLE_TEACHER):
+        raise HTTPException(403, "Недостаточно прав.")
     col = get_db()
     return [
-        {"username": u["username"], "group": u.get("group", "")}
-        for u in col.find({"role": ROLE_STUDENT}, {"_id": 0, "username": 1, "group": 1})
+        {"username": u["username"], "group": u.get("group", ""), "full_name": u.get("full_name", "")}
+        for u in col.find({"role": ROLE_STUDENT}, {"_id": 0, "username": 1, "group": 1, "full_name": 1})
     ]
 
 
@@ -143,9 +169,24 @@ async def change_role(username: str, req: ChangeRoleRequest, user=Depends(get_cu
     return {"message": f"Роль пользователя {username} изменена на {req.role}."}
 
 
+@router.put("/auth/users/{username}/full-name")
+async def update_full_name(username: str, req: UpdateFullNameRequest, user=Depends(get_current_user)):
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    col = get_db()
+    result = col.update_one({"username": username}, {"$set": {"full_name": req.full_name}})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Пользователь не найден.")
+    return {"message": f"ФИО пользователя {username} обновлено."}
+
+
 @router.get("/auth/verify")
 async def verify_token_endpoint(user=Depends(get_current_user)):
-    return {"username": user["sub"], "role": user["role"]}
+    col = get_db()
+    db_user = col.find_one({"username": user["sub"]}, {"_id": 0, "token_version": 1, "full_name": 1})
+    if db_user and db_user.get("token_version", 0) != user.get("tv", 0):
+        raise HTTPException(401, "Токен недействителен. Пароль был изменён.")
+    return {"username": user["sub"], "role": user["role"], "full_name": (db_user or {}).get("full_name", "")}
 
 
 @router.delete("/auth/users/{username}")
@@ -174,9 +215,12 @@ async def change_password(username: str, req: ChangePasswordRequest, user=Depend
         raise HTTPException(404, "Пользователь не найден.")
     if not verify_password(req.old_password, target["password"]):
         raise HTTPException(400, "Неверный текущий пароль.")
-    col.update_one({"username": username}, {"$set": {"password": hash_password(req.new_password)}})
+    col.update_one({"username": username}, {
+        "$set": {"password": hash_password(req.new_password)},
+        "$inc": {"token_version": 1},
+    })
     logger.info("Password changed for user '%s'", username)
-    return {"message": "Пароль успешно изменён."}
+    return {"message": "Пароль успешно изменён.", "force_logout": True}
 
 
 @router.put("/auth/users/{username}/reset-password")
@@ -188,7 +232,10 @@ async def reset_password(username: str, req: ResetPasswordRequest, user=Depends(
     target = col.find_one({"username": username})
     if not target:
         raise HTTPException(404, "Пользователь не найден.")
-    col.update_one({"username": username}, {"$set": {"password": hash_password(req.new_password)}})
+    col.update_one({"username": username}, {
+        "$set": {"password": hash_password(req.new_password)},
+        "$inc": {"token_version": 1},
+    })
     logger.info("Password reset for user '%s' by admin '%s'", username, user["sub"])
     return {"message": f"Пароль пользователя {username} сброшен."}
 

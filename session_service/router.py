@@ -6,7 +6,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pymongo import DESCENDING
 
-from database import get_col, CONTENT_SERVICE_URL, TEST_SERVICE_URL
+from database import get_col, get_active_sessions_col, CONTENT_SERVICE_URL, TEST_SERVICE_URL
 from security import get_current_user, auth_header, service_auth_header
 from models import StartSessionBody, SubmitAnswerBody
 from session import TestSession
@@ -15,11 +15,107 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# In-memory store of active sessions (not persisted across restarts)
+# In-memory cache of active sessions (also persisted to MongoDB)
 _sessions: dict = {}
 
 # Maximum time (in hours) before a stale session is auto-removed
 _SESSION_STALE_HOURS = 6
+
+
+# ------------------------------------------------------------------
+# DB-backed session persistence helpers
+# ------------------------------------------------------------------
+
+def _save_session_to_db(session: TestSession):
+    """Persist session state to MongoDB."""
+    try:
+        doc = session.to_dict()
+        get_active_sessions_col().replace_one({"session_id": session.session_id}, doc, upsert=True)
+    except Exception as e:
+        logger.error("Failed to persist session %s to DB: %s", session.session_id, e)
+
+
+def _load_session_from_db(session_id: str, username: str):
+    """Load session from MongoDB. Returns TestSession or None."""
+    doc = get_active_sessions_col().find_one({"session_id": session_id, "username": username})
+    if not doc:
+        return None
+    return TestSession.from_dict(doc)
+
+
+def _delete_session_from_db(session_id: str):
+    """Delete session from MongoDB."""
+    try:
+        result = get_active_sessions_col().delete_one({"session_id": session_id})
+        logger.info("Deleted session %s from DB (matched=%d)", session_id, result.deleted_count)
+    except Exception as e:
+        logger.error("Failed to delete session %s from DB: %s", session_id, e)
+
+
+def _delete_all_sessions_for_user(username: str):
+    """Delete ALL active sessions for a user from MongoDB. Prevents orphans from race conditions."""
+    try:
+        result = get_active_sessions_col().delete_many({"username": username})
+        if result.deleted_count > 0:
+            logger.info("Cleaned up %d orphaned session(s) for user %s", result.deleted_count, username)
+        # Also clean memory cache
+        to_remove = [sid for sid, s in _sessions.items() if s.username == username]
+        for sid in to_remove:
+            _sessions.pop(sid, None)
+    except Exception as e:
+        logger.error("Failed to clean sessions for user %s: %s", username, e)
+
+
+def _find_active_session_for_user(username: str):
+    """Find any active session for a user in MongoDB."""
+    doc = get_active_sessions_col().find_one({"username": username})
+    if not doc:
+        return None
+    return TestSession.from_dict(doc)
+
+
+def _auto_finish_expired(session: TestSession) -> dict:
+    """Auto-finish an expired session, save results, clean up."""
+    while session.current_question_index < len(session.questions):
+        session.user_answers.append(None)
+        session.current_question_index += 1
+    results = session._evaluate_and_finish()
+    _delete_session_from_db(session.session_id)
+    _sessions.pop(session.session_id, None)
+    return results
+
+
+# ------------------------------------------------------------------
+# Active session endpoint (for resume after tab close)
+# ------------------------------------------------------------------
+
+@router.get("/sessions/active")
+async def get_active_session(user=Depends(get_current_user)):
+    """Return the user's active (in-progress) session, if any."""
+    session = _find_active_session_for_user(user["sub"])
+    if not session:
+        return {"active": False}
+    # Auto-finish expired sessions
+    if session.is_time_expired():
+        results = _auto_finish_expired(session)
+        return {"active": False, "finished_expired": True, "results": results}
+    # Safety: clean up completed sessions that weren't deleted properly
+    if session.current_question_index >= len(session.questions):
+        logger.warning("Found orphaned completed session %s for user %s, cleaning up", session.session_id, user["sub"])
+        _delete_session_from_db(session.session_id)
+        _sessions.pop(session.session_id, None)
+        return {"active": False}
+    return {
+        "active": True,
+        "session_id": session.session_id,
+        "test_id": session.premade_test_id,
+        "test_name": session.test_name,
+        "current_question_index": session.current_question_index,
+        "total_questions": len(session.questions),
+        "current_question": session.get_current_question(),
+        "past_questions": session.get_past_questions(),
+        "past_answers": session.user_answers[:session.current_question_index],
+    }
 
 
 # ------------------------------------------------------------------
@@ -36,6 +132,34 @@ async def start_session(
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         if body.test_id:
+            # Check for existing active session for this user
+            existing = _find_active_session_for_user(username)
+            if existing:
+                # Safety: clean up completed sessions
+                if existing.current_question_index >= len(existing.questions):
+                    logger.warning("Cleaning up orphaned completed session %s", existing.session_id)
+                    _delete_session_from_db(existing.session_id)
+                    _sessions.pop(existing.session_id, None)
+                    existing = None  # allow creating new session
+
+            if existing:
+                if existing.premade_test_id == body.test_id:
+                    # Resume existing session
+                    if existing.is_time_expired():
+                        results = _auto_finish_expired(existing)
+                        return {"finished": True, "results": results, "timed_out": True}
+                    logger.info("Resuming session %s for user %s", existing.session_id, username)
+                    return {
+                        "session_id": existing.session_id,
+                        "total_questions": len(existing.questions),
+                        "current_question": existing.get_current_question(),
+                        "resumed": True,
+                        "past_questions": existing.get_past_questions(),
+                        "past_answers": existing.user_answers[:existing.current_question_index],
+                    }
+                else:
+                    raise HTTPException(409, "У вас уже есть активный тест. Завершите его прежде чем начинать новый.")
+
             # Fetch test data first (needed for eligibility check + session creation)
             # Use service token so test_service returns full data (with correct answers)
             try:
@@ -124,7 +248,10 @@ async def start_session(
             raise HTTPException(400, "Укажите test_id или num_questions_per_category.")
 
     _cleanup_stale_sessions()
+    # Atomically remove any leftover sessions for this user before saving
+    _delete_all_sessions_for_user(username)
     _sessions[session.session_id] = session
+    _save_session_to_db(session)
     logger.info("Session %s started for user %s (test_id=%s)", session.session_id, username, body.test_id)
     return {
         "session_id": session.session_id,
@@ -139,6 +266,16 @@ async def submit_answer(session_id: str, body: SubmitAnswerBody, user=Depends(ge
     result = session.submit_answer(body.answer)
     if result.get("finished"):
         _sessions.pop(session_id, None)
+        _delete_session_from_db(session_id)
+        # Strip correct answers from student-facing results
+        if user["role"] == "student":
+            results_inner = result.get("results") or result
+            for a in results_inner.get("answers", []):
+                a.pop("correct_answer", None)
+    else:
+        # Persist updated state
+        _sessions[session_id] = session
+        _save_session_to_db(session)
     return result
 
 
@@ -213,7 +350,13 @@ async def get_user_history(username: str, user=Depends(get_current_user)):
         raise HTTPException(403, "Нет доступа к истории другого пользователя.")
     col = get_col()
     records = [{k: v for k, v in r.items() if k != "_id"} for r in col.find({"username": username})]
-    return _process_history(records)
+    processed = _process_history(records)
+    # Strip correct answers from student-facing results to prevent cheating on retakes
+    if user["role"] == "student":
+        for r in processed:
+            for a in r.get("answers", []):
+                a.pop("correct_answer", None)
+    return processed
 
 
 # ------------------------------------------------------------------
@@ -248,11 +391,16 @@ async def check_eligibility(
 
 def _get_session(session_id: str, username: str) -> TestSession:
     session = _sessions.get(session_id)
-    if not session:
+    if session:
+        if session.username != username:
+            raise HTTPException(403, "Нет доступа к этой сессии.")
+        return session
+    # Fall back to MongoDB
+    db_session = _load_session_from_db(session_id, username)
+    if not db_session:
         raise HTTPException(404, "Сессия не найдена.")
-    if session.username != username:
-        raise HTTPException(403, "Нет доступа к этой сессии.")
-    return session
+    _sessions[session_id] = db_session  # cache in memory
+    return db_session
 
 
 def _cleanup_stale_sessions() -> None:
@@ -265,6 +413,12 @@ def _cleanup_stale_sessions() -> None:
     for sid in stale_ids:
         logger.info("Removing stale session: %s", sid)
         _sessions.pop(sid, None)
+    # Also clean stale sessions from DB
+    cutoff = (now - timedelta(hours=_SESSION_STALE_HOURS)).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        get_active_sessions_col().delete_many({"start_time": {"$lt": cutoff}})
+    except Exception:
+        pass
 
 
 def _process_history(user_history: list) -> list:

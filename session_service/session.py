@@ -245,6 +245,66 @@ class TestSession:
         except Exception as e:
             logger.error("Failed to save test result for session %s: %s", self.session_id, e)
 
+    # ------------------------------------------------------------------
+    # Serialization for MongoDB persistence
+    # ------------------------------------------------------------------
+
+    def to_dict(self) -> dict:
+        """Serialize session state for MongoDB persistence."""
+        return {
+            "session_id": self.session_id,
+            "username": self.username,
+            "questions": self.questions,
+            "grading_criteria": self.grading_criteria,
+            "premade_test_id": self.premade_test_id,
+            "test_name": self.test_name,
+            "time_limit_minutes": self.time_limit_minutes,
+            "user_answers": self.user_answers,
+            "current_question_index": self.current_question_index,
+            "correct_answers": self.correct_answers,
+            "results": self.results,
+            "category_max_points": self.category_max_points,
+            "start_time": self.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TestSession":
+        """Reconstruct a TestSession from a MongoDB document."""
+        obj = cls.__new__(cls)
+        obj.session_id = data["session_id"]
+        obj.username = data["username"]
+        obj.questions = data["questions"]
+        obj.grading_criteria = data["grading_criteria"]
+        obj.premade_test_id = data.get("premade_test_id")
+        obj.test_name = data.get("test_name")
+        obj.time_limit_minutes = data.get("time_limit_minutes")
+        obj.user_answers = data.get("user_answers", [])
+        obj.current_question_index = data.get("current_question_index", 0)
+        obj.correct_answers = data.get("correct_answers", 0)
+        obj.results = data.get("results", {})
+        obj.category_max_points = data.get("category_max_points", {})
+        obj.start_time = datetime.strptime(data["start_time"], "%Y-%m-%d %H:%M:%S")
+        obj.end_time = None
+        obj.formatted_duration = ""
+        return obj
+
+    def get_past_questions(self) -> list:
+        """Return list of past questions for review (without correct answers)."""
+        result = []
+        for i in range(self.current_question_index):
+            q = self.questions[i]
+            result.append({
+                "index": i,
+                "question_number": i + 1,
+                "question": q["question"],
+                "options": q["options"],
+                "answer_type": q.get("answer_type", "single"),
+                "matrices": q.get("matrices"),
+                "commands": q.get("commands"),
+                "total_questions": len(self.questions),
+            })
+        return result
+
     def _evaluate_and_finish(self) -> dict:
         """
         Inference engine entry point.

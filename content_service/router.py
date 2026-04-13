@@ -138,6 +138,9 @@ async def save_criteria(
         raise HTTPException(403, "Недостаточно прав.")
     db = get_db()
     effective_role = user["role"]
+    # Teachers can only save their own criteria
+    if effective_role == "teacher" and username != user["sub"]:
+        raise HTTPException(403, "Вы можете изменять только свои критерии.")
     key = DEFAULT_CRITERIA_KEY if effective_role == "admin" else username
     db["criteria"].update_one(
         {"key": key},

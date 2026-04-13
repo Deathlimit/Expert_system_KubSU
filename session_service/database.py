@@ -25,7 +25,17 @@ def get_col():
             logger.error("Failed to connect to MongoDB: %s", e)
             _client = None
             raise RuntimeError(f"Database connection failed: {e}")
-        col = _client["testing_expert"]["test_results"]
-        col.create_index([("username", 1), ("premade_test_id", 1)])
-        col.create_index([("end_time", DESCENDING)])
+        _client["testing_expert"]["test_results"].create_index([("username", 1), ("premade_test_id", 1)])
+        _client["testing_expert"]["test_results"].create_index([("end_time", DESCENDING)])
     return _client["testing_expert"]["test_results"]
+
+
+def get_active_sessions_col():
+    """Return the 'active_sessions' collection for persistent test sessions."""
+    global _client
+    if _client is None:
+        get_col()  # ensure connection
+    col = _client["testing_expert"]["active_sessions"]
+    col.create_index("session_id", unique=True)
+    col.create_index("username")
+    return col

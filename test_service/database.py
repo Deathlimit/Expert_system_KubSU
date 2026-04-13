@@ -28,6 +28,11 @@ def get_col():
     return _client["testing_expert"]["premade_tests"]
 
 
+def get_users_col():
+    get_col()  # ensure _client is initialised
+    return _client["testing_expert"]["users"]
+
+
 def clean(doc: dict) -> dict:
     """Remove MongoDB _id from a document."""
     doc.pop("_id", None)

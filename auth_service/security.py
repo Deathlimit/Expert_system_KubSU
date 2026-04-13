@@ -33,10 +33,11 @@ def verify_password(password: str, hashed: str) -> bool:
         return False
 
 
-def create_token(username: str, role: str) -> str:
+def create_token(username: str, role: str, token_version: int = 0) -> str:
     payload = {
         "sub": username,
         "role": role,
+        "tv": token_version,
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)

@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header
 
-from database import get_col, clean, CONTENT_SERVICE_URL
+from database import get_col, clean, CONTENT_SERVICE_URL, get_users_col
 from security import get_current_user, get_auth_header
-from models import CreateTestBody, AssignBody, BatchAssignBody, GenerateTestBody, AddQuestionsBody, RenameTestBody
+from models import CreateTestBody, AssignBody, BatchAssignBody, GenerateTestBody, AddQuestionsBody, RenameTestBody, UpdateTestSettingsBody
 
 logger = logging.getLogger(__name__)
 
@@ -23,27 +23,52 @@ def _strip_correct(t: dict) -> dict:
     return t
 
 
+def _enrich_creator(tests: list) -> list:
+    """Add creator_full_name to each test dict by looking up the users collection."""
+    usernames = list({t.get("creator_username") for t in tests if t.get("creator_username")})
+    if not usernames:
+        return tests
+    users = {u["username"]: u.get("full_name", "") for u in get_users_col().find({"username": {"$in": usernames}}, {"username": 1, "full_name": 1})}
+    for t in tests:
+        cu = t.get("creator_username", "")
+        t["creator_full_name"] = users.get(cu) or cu
+    return tests
+
+
 @router.get("/tests")
 async def list_tests(user=Depends(get_current_user)):
     if user["role"] == "student":
         # Students should only see tests assigned to them
         return [_strip_correct(clean(t)) for t in get_col().find({"assigned_students": user["sub"]}, {"_id": 0})]
-    return [clean(t) for t in get_col().find({}, {"_id": 0})]
+    return _enrich_creator([clean(t) for t in get_col().find({}, {"_id": 0})])
 
 
 @router.get("/tests/creator/{username}")
 async def list_tests_by_creator(username: str, user=Depends(get_current_user)):
-    return [clean(t) for t in get_col().find({"creator_username": username}, {"_id": 0})]
+    if user["role"] not in ("teacher", "admin"):
+        raise HTTPException(403, "Недостаточно прав.")
+    return _enrich_creator([clean(t) for t in get_col().find({"creator_username": username}, {"_id": 0})])
 
 
 @router.get("/tests/assigned/{student_username}")
 async def get_assigned_tests(student_username: str, user=Depends(get_current_user)):
-    """Return assigned tests grouped by teacher."""
+    """Return assigned tests grouped by teacher full_name."""
     is_student = user["role"] == "student"
+    # Build username → full_name lookup for creators
+    _name_cache: dict = {}
+    def _creator_display(username: str) -> str:
+        if username not in _name_cache:
+            u = get_users_col().find_one({"username": username}, {"full_name": 1})
+            _name_cache[username] = (u.get("full_name") if u else None) or username
+        return _name_cache[username]
+
     result: dict = {}
     for t in get_col().find({"assigned_students": student_username}, {"_id": 0}):
         creator = t.get("creator_username", "Неизвестный преподаватель")
-        result.setdefault(creator, []).append(_strip_correct(t) if is_student else t)
+        display = _creator_display(creator)
+        t_clean = _strip_correct(t) if is_student else t
+        t_clean["creator_full_name"] = display
+        result.setdefault(display, []).append(t_clean)
     for teacher in result:
         result[teacher].sort(key=lambda x: x.get("test_name", ""))
     return result
@@ -54,6 +79,8 @@ async def get_test(test_id: str, user=Depends(get_current_user)):
     t = get_col().find_one({"test_id": test_id}, {"_id": 0})
     if not t:
         raise HTTPException(404, "Тест не найден.")
+    t = clean(t)
+    _enrich_creator([t])
     # Hide correct answers from students
     if user["role"] == "student":
         t = dict(t)
@@ -94,6 +121,23 @@ async def rename_test(test_id: str, body: RenameTestBody, user=Depends(get_curre
     get_col().update_one({"test_id": test_id}, {"$set": {"test_name": body.test_name}})
     logger.info("Test '%s' renamed to '%s' by %s", test_id, body.test_name, user["sub"])
     return {"message": f"Тест переименован в '{body.test_name}'."}
+
+
+@router.put("/tests/{test_id}/settings")
+async def update_test_settings(test_id: str, body: UpdateTestSettingsBody, user=Depends(get_current_user)):
+    if user["role"] not in ("teacher", "admin"):
+        raise HTTPException(403, "Недостаточно прав.")
+    t = get_col().find_one({"test_id": test_id})
+    if not t:
+        raise HTTPException(404, "Тест не найден.")
+    updates = {
+        "time_limit_minutes": body.time_limit_minutes,
+        "cooldown_hours": body.cooldown_hours if body.cooldown_hours is not None else 0,
+        "max_attempts": body.max_attempts,
+    }
+    get_col().update_one({"test_id": test_id}, {"$set": updates})
+    logger.info("Test '%s' settings updated by %s", test_id, user["sub"])
+    return {"message": "Настройки теста обновлены."}
 
 
 @router.post("/tests/{test_id}/clone")

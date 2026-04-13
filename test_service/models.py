@@ -31,3 +31,9 @@ class AddQuestionsBody(BaseModel):
 
 class RenameTestBody(BaseModel):
     test_name: str = Field(..., min_length=1, max_length=300)
+
+
+class UpdateTestSettingsBody(BaseModel):
+    time_limit_minutes: Optional[int] = Field(default=None, ge=1)
+    cooldown_hours: Optional[int] = Field(default=None, ge=0)
+    max_attempts: Optional[int] = Field(default=None, ge=1)

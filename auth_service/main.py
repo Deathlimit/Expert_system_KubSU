@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import get_db
+from database import get_db, ensure_demo_test
 from router import router
 
 logging.basicConfig(
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(_app: FastAPI):
     logger.info("Auth Service starting up...")
     get_db()
+    ensure_demo_test()
     logger.info("Auth Service ready.")
     yield
     logger.info("Auth Service shutting down.")
