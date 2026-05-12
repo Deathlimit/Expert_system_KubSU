@@ -343,6 +343,32 @@ async def get_all_history(user=Depends(get_current_user)):
     return [{k: v for k, v in r.items() if k != "_id"} for r in col.find().sort("start_time", DESCENDING)]
 
 
+@router.delete("/sessions/history")
+async def clear_history(
+    username: str = None,
+    test_id: str = None,
+    user=Depends(get_current_user),
+):
+    """Clear history records. If username is provided, clear only that user's history.
+    If test_id is provided, clear history for that test.
+    If both are provided, clear only records matching both."""
+    if user["role"] not in ("teacher", "admin"):
+        raise HTTPException(403, "Недостаточно прав.")
+
+    col = get_col()
+    query = {}
+    if username:
+        query["username"] = username
+    if test_id:
+        query["premade_test_id"] = test_id
+
+    if not query:
+        raise HTTPException(400, "Укажите username или test_id для очистки истории.")
+
+    result = col.delete_many(query)
+    return {"deleted": result.deleted_count}
+
+
 @router.get("/sessions/history/{username}")
 async def get_user_history(username: str, user=Depends(get_current_user)):
     # Students can only view their own history

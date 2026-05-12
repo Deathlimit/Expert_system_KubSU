@@ -18,6 +18,10 @@ class ChangeRoleRequest(BaseModel):
     role: str = Field(..., min_length=1, max_length=20)
 
 
+class ChangeGroupRequest(BaseModel):
+    group: Optional[str] = Field(default="", max_length=50)
+
+
 class ChangePasswordRequest(BaseModel):
     old_password: str = Field(..., min_length=1, max_length=200)
     new_password: str = Field(..., min_length=6, max_length=200)

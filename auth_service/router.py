@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db, get_groups_col, get_tests_col, DEMO_TEST_ID, ROLE_ADMIN, ROLE_TEACHER, ROLE_STUDENT, ROLE_UNASSIGNED
 from security import hash_password, verify_password, create_token, get_current_user
-from models import LoginRequest, RegisterRequest, ChangeRoleRequest, ChangePasswordRequest, ResetPasswordRequest, GroupBody, UpdateFullNameRequest
+from models import LoginRequest, RegisterRequest, ChangeRoleRequest, ChangeGroupRequest, ChangePasswordRequest, ResetPasswordRequest, GroupBody, UpdateFullNameRequest
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +168,21 @@ async def change_role(username: str, req: ChangeRoleRequest, user=Depends(get_cu
         raise HTTPException(404, "Пользователь не найден.")
     return {"message": f"Роль пользователя {username} изменена на {req.role}."}
 
+
+@router.put("/auth/users/{username}/group")
+async def change_group(username: str, req: ChangeGroupRequest, user=Depends(get_current_user)):
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    group = (req.group or "").strip()
+    if group and not get_groups_col().find_one({"name": group}):
+        raise HTTPException(400, f"Группа '{group}' не существует.")
+    col = get_db()
+    result = col.update_one({"username": username}, {"$set": {"group": group}})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Пользователь не найден.")
+    logger.info("Group for user '%s' changed to '%s' by admin '%s'", username, group, user["sub"])
+    display_group = group or "без группы"
+    return {"message": f"Группа пользователя {username} изменена на {display_group}."}
 
 @router.put("/auth/users/{username}/full-name")
 async def update_full_name(username: str, req: UpdateFullNameRequest, user=Depends(get_current_user)):
