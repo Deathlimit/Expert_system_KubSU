@@ -616,8 +616,12 @@ tr:hover td { background: var(--table-hover); }
 
 .matrix-container { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1rem; }
 .matrix-block { display: inline-block; }
-.matrix-table { border-collapse: collapse; }
-.matrix-table td { padding: 6px 12px; border: 1px solid var(--border); text-align: center; font-family: monospace; }
+.matrix-table { border-collapse: collapse; margin: 0 auto; }
+.matrix-table td { padding: 4px; border: 1px solid var(--border); text-align: center; background: var(--bg-input); }
+.matrix-table input { border: none; background: transparent !important; text-align: center; font-family: monospace; font-size: .95rem; width: 100%; color: var(--text-primary) !important; }
+.matrix-table input:focus { outline: none; background: var(--bg-focus) !important; border-radius: 2px; }
+.matrix-table input::placeholder { color: var(--text-muted) !important; opacity: 0.5; }
+.matrix-table td { cursor: text; }
 
 .commands-container { margin-bottom: 1rem; }
 .command-block {

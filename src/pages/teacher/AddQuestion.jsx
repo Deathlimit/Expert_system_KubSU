@@ -43,7 +43,7 @@ export default function AddQuestion() {
 
   const addMatrix = () => {
     if (matrices.length >= 5) return;
-    setMatrices([...matrices, { name: `Matrix${matrices.length + 1}`, rows: 2, cols: 2, data: [[0, 0], [0, 0]] }]);
+    setMatrices([...matrices, { name: `Matrix${matrices.length + 1}`, rows: 2, cols: 2, data: [['', ''], ['', '']] }]);
   };
 
   const updateMatrixCell = (mi, ri, ci, val) => {
@@ -59,7 +59,7 @@ export default function AddQuestion() {
     for (let r = 0; r < newRows; r++) {
       const row = [];
       for (let c = 0; c < newCols; c++) {
-        row.push(old[r]?.[c] ?? 0);
+        row.push(old[r]?.[c] ?? '');
       }
       data.push(row);
     }
@@ -142,21 +142,26 @@ export default function AddQuestion() {
           {useMatrices && (
             <div className="ml-4">
               {matrices.map((mat, mi) => (
-                <div key={mi} className="card" style={{ padding: '.75rem', marginBottom: '.5rem' }}>
-                  <div className="flex items-center gap-sm mb-2">
-                    <input className="input" style={{ width: 150 }} value={mat.name} onChange={e => { const m = [...matrices]; m[mi] = { ...m[mi], name: e.target.value }; setMatrices(m); }} />
-                    <label className="text-sm text-secondary">Строки:</label>
-                    <input type="number" className="input" style={{ width: 60 }} min={1} max={10} value={mat.rows} onChange={e => resizeMatrix(mi, +e.target.value, mat.cols)} />
-                    <label className="text-sm text-secondary">Столбцы:</label>
-                    <input type="number" className="input" style={{ width: 60 }} min={1} max={10} value={mat.cols} onChange={e => resizeMatrix(mi, mat.rows, +e.target.value)} />
+                <div key={mi} style={{ padding: '.75rem', marginBottom: '.5rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+                  <div className="flex items-center gap-sm mb-2" style={{ flexWrap: 'wrap' }}>
+                    <input className="input" style={{ width: 150 }} value={mat.name} onChange={e => { const m = [...matrices]; m[mi] = { ...m[mi], name: e.target.value }; setMatrices(m); }} placeholder="Название матрицы" />
+                    <span className="text-sm text-secondary">×</span>
+                    <div className="flex items-center gap-xs">
+                      <label className="text-sm text-secondary">Строк:</label>
+                      <input type="number" className="input" style={{ width: 55 }} min={1} max={10} value={mat.rows} onChange={e => resizeMatrix(mi, +e.target.value, mat.cols)} />
+                    </div>
+                    <div className="flex items-center gap-xs">
+                      <label className="text-sm text-secondary">Столбцов:</label>
+                      <input type="number" className="input" style={{ width: 55 }} min={1} max={10} value={mat.cols} onChange={e => resizeMatrix(mi, mat.rows, +e.target.value)} />
+                    </div>
                     <button className="btn btn-danger btn-sm" onClick={() => removeMatrix(mi)}><FiTrash2 size={14} /></button>
                   </div>
-                  <table className="matrix-table">
+                  <table className="matrix-table" onClick={e => { const input = e.target.closest('td')?.querySelector('input'); if (input) input.focus(); }}>
                     <tbody>
                       {mat.data.map((row, ri) => (
                         <tr key={ri}>
                           {row.map((cell, ci) => (
-                            <td key={ci}><input type="number" className="input" style={{ width: 60, textAlign: 'center' }} value={cell} onChange={e => updateMatrixCell(mi, ri, ci, +e.target.value)} /></td>
+                            <td key={ci}><input className="matrix-cell-input" style={{ width: 60, textAlign: 'center' }} value={cell} placeholder="-" onChange={e => updateMatrixCell(mi, ri, ci, e.target.value)} /></td>
                           ))}
                         </tr>
                       ))}
@@ -188,17 +193,6 @@ export default function AddQuestion() {
           )}
         </div>
 
-        {/* Options */}
-        <div className="form-group">
-          <label className="form-label">Варианты ответа (мин. 2)</label>
-          {options.map((opt, i) => (
-            <div key={i} className="flex items-center gap-sm mb-2">
-              <span className="option-letter-badge">{String.fromCharCode(65 + i)}</span>
-              <input className="input" style={{ flex: 1 }} value={opt} onChange={e => { const o = [...options]; o[i] = e.target.value; setOptions(o); }} placeholder={`Вариант ${i + 1}`} />
-            </div>
-          ))}
-        </div>
-
         {/* Answer type */}
         <div className="form-group">
           <label className="form-label">Тип ответа</label>
@@ -208,20 +202,20 @@ export default function AddQuestion() {
           </div>
         </div>
 
-        {/* Correct answer selection */}
+        {/* Options with correct answer selection */}
         <div className="form-group">
-          <label className="form-label">Правильный ответ</label>
-          <div className="flex flex-col gap-xs">
-            {validOptions.map((opt, i) => (
-              <label key={i} className="flex items-center gap-xs">
-                {answerType === 'single'
-                  ? <input type="radio" name="correct" checked={correctSingle === opt} onChange={() => setCorrectSingle(opt)} />
-                  : <input type="checkbox" checked={correctMultiple.includes(opt)} onChange={() => setCorrectMultiple(prev => prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt])} />
-                }
-                <span>{opt}</span>
-              </label>
-            ))}
-          </div>
+          <label className="form-label">Варианты ответа (мин. 2)</label>
+          {options.map((opt, i) => (
+            <div key={i} className="flex items-center gap-sm mb-2">
+              <span className="option-letter-badge">{String.fromCharCode(65 + i)}</span>
+              <input className="input" style={{ flex: 1 }} value={opt} onChange={e => { const o = [...options]; o[i] = e.target.value; setOptions(o); }} placeholder={`Вариант ${i + 1}`} />
+              {opt.trim() && (
+                answerType === 'single'
+                  ? <input type="radio" name="correct" checked={correctSingle === opt} onChange={() => setCorrectSingle(opt)} title="Правильный ответ" />
+                  : <input type="checkbox" checked={correctMultiple.includes(opt)} onChange={() => setCorrectMultiple(prev => prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt])} title="Правильный ответ" />
+              )}
+            </div>
+          ))}
         </div>
 
         {/* Points */}

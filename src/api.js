@@ -124,6 +124,9 @@ export async function getAllGroups() {
 export async function changeUserRole(username, role) {
   return request('PUT', `${AUTH}/users/${encodeURIComponent(username)}/role`, { role });
 }
+export async function changeUserGroup(username, group) {
+  return request('PUT', `${AUTH}/users/${encodeURIComponent(username)}/group`, { group: group || '' });
+}
 export async function deleteUser(username) {
   return request('DELETE', `${AUTH}/users/${encodeURIComponent(username)}`);
 }
@@ -250,6 +253,13 @@ export async function getTestHistory() {
 }
 export async function getUserHistory(username) {
   return request('GET', `${SESSIONS}/history/${encodeURIComponent(username)}`);
+}
+export async function clearHistory(username = null, testId = null) {
+  const params = new URLSearchParams();
+  if (username) params.append('username', username);
+  if (testId) params.append('test_id', testId);
+  const query = params.toString();
+  return request('DELETE', `${SESSIONS}/history${query ? '?' + query : ''}`);
 }
 export async function getTestResults(testId) {
   return request('GET', `${SESSIONS}/results/test/${testId}`);

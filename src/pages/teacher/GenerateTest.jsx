@@ -32,7 +32,7 @@ export default function GenerateTest() {
     setLoading(false);
     if (res.ok) {
       setGenerated(res.data);
-      setTestName(`${topic} — ${maxScore} баллов`);
+      setTestName(`${topic} — ${res.data.total_score} баллов`);
     } else {
       toast(res.data?.detail || 'Ошибка генерации', 'error');
     }

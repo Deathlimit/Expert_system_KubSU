@@ -5,7 +5,7 @@ import SortableTable from '../../components/SortableTable';
 import Modal from '../../components/Modal';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import * as api from '../../api';
-import { FiTrash2, FiPlus, FiUsers, FiBarChart2, FiDownload, FiSearch, FiSliders, FiCopy, FiEdit2, FiSettings } from 'react-icons/fi';
+import { FiTrash2, FiPlus, FiUsers, FiBarChart2, FiDownload, FiSearch, FiSliders, FiCopy, FiEdit2, FiSettings, FiAlertTriangle } from 'react-icons/fi';
 
 export default function ManageTests() {
   const [tab, setTab] = useState('manage');
@@ -337,6 +337,7 @@ function StatisticsModal({ testId, testName, onClose }) {
   const [studentsByGroup, setStudentsByGroup] = useState({});
   const [nameMap, setNameMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [detailResult, setDetailResult] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -433,8 +434,37 @@ function StatisticsModal({ testId, testName, onClose }) {
               {groups.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
-          <SortableTable columns={columns} data={filtered} emptyText="Нет результатов" />
+          <SortableTable columns={columns} data={filtered} emptyText="Нет результатов" onRowClick={setDetailResult} />
         </>
+      )}
+
+      {detailResult && (
+        <Modal title="Детали" onClose={() => setDetailResult(null)}>
+          <div className="text-sm">
+            <p><strong>Студент:</strong> {nameMap[detailResult.username] || detailResult.username}</p>
+            <p><strong>Тест:</strong> {detailResult.test_name}</p>
+            <p><strong>Результат:</strong> {detailResult.final_status} ({detailResult.score_percentage?.toFixed(1)}%)</p>
+            <p><strong>Длительность:</strong> {detailResult.duration}</p>
+          </div>
+          {detailResult.answers && detailResult.answers.length > 0 && (
+            <div className="mt-2">
+              <h4 style={{ marginBottom: '.5rem' }}>Ответы</h4>
+              {detailResult.answers.map((a, i) => {
+                const normalize = v => Array.isArray(v) ? JSON.stringify([...v].sort()) : JSON.stringify(v);
+                const correct = normalize(a.user_answer) === normalize(a.correct_answer);
+                return (
+                  <div key={i} style={{ padding: '.5rem', marginBottom: '.25rem', borderRadius: 6, background: correct ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)' }}>
+                    <div style={{ fontWeight: 600, fontSize: '.85rem' }}>{i + 1}. {a.question}</div>
+                    <div className="text-sm text-secondary">
+                      Ответ: {Array.isArray(a.user_answer) ? a.user_answer.join(', ') : (a.user_answer || '—')}
+                      {!correct && <> | Верный: {Array.isArray(a.correct_answer) ? a.correct_answer.join(', ') : a.correct_answer}</>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
       )}
     </Modal>
   );
@@ -558,6 +588,10 @@ function HistoryTab() {
   const [studentNameMap, setStudentNameMap] = useState({});
   const [nameToUsername, setNameToUsername] = useState({});
   const [groupOptions, setGroupOptions] = useState([]);
+  const [testOptions, setTestOptions] = useState([]);
+  const [resetMode, setResetMode] = useState(null); // 'student' | 'test' | null
+  const [resetTarget, setResetTarget] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getStudents(), api.getAllGroups()]).then(([sr, gr]) => {
@@ -577,7 +611,32 @@ function HistoryTab() {
       }
       if (gr.ok) setGroupOptions(gr.data || []);
     });
+    api.getAllTests().then(tr => {
+      if (tr.ok) setTestOptions((tr.data || []).map(t => ({ value: t.test_id, label: t.name || t.test_id })));
+    });
   }, []);
+
+  const handleResetHistory = async () => {
+    if (!resetTarget.trim()) { toast('Выберите цель для очистки', 'error'); return; }
+    setResetting(true);
+    let res;
+    if (resetMode === 'student') {
+      const username = nameToUsername[resetTarget.trim()] || resetTarget.trim();
+      res = await api.clearHistory(username, null);
+    } else if (resetMode === 'test') {
+      const testId = testOptions.find(t => t.label === resetTarget.trim())?.value || resetTarget.trim();
+      res = await api.clearHistory(null, testId);
+    }
+    setResetting(false);
+    if (res?.ok) {
+      toast(`Удалено записей: ${res.data?.deleted || 0}`, 'success');
+      setResetMode(null);
+      setResetTarget('');
+      handleSearch();
+    } else {
+      toast(res?.data?.detail || 'Ошибка при очистке', 'error');
+    }
+  };
 
   const searchOptions = searchMode === 'student' ? studentOptions : groupOptions;
 
@@ -637,6 +696,27 @@ function HistoryTab() {
           onEnter={handleSearch}
         />
         <button className="btn btn-primary btn-sm" onClick={handleSearch} disabled={loading}><FiSearch size={14} /> Найти</button>
+        {!resetMode ? (
+          <button className="btn btn-danger btn-sm" onClick={() => setResetMode('student')} title="Сбросить историю"><FiTrash2 size={14} /> Сбросить историю</button>
+        ) : (
+          <div className="flex items-center gap-sm">
+            <select className="input" style={{ width: 120 }} value={resetMode} onChange={e => setResetMode(e.target.value)}>
+              <option value="student">По студенту</option>
+              <option value="test">По тесту</option>
+            </select>
+            <AutocompleteInput
+              value={resetTarget}
+              onChange={setResetTarget}
+              options={resetMode === 'student' ? studentOptions : testOptions.map(t => t.label)}
+              placeholder={resetMode === 'student' ? 'Имя студента...' : 'Название теста...'}
+              style={{ width: 200 }}
+            />
+            <button className="btn btn-danger btn-sm" onClick={handleResetHistory} disabled={resetting}>
+              <FiAlertTriangle size={14} /> {resetting ? 'Удаление...' : 'Подтвердить'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setResetMode(null); setResetTarget(''); }}>Отмена</button>
+          </div>
+        )}
       </div>
 
       {results.length > 0 && (

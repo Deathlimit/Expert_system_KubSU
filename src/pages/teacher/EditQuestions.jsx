@@ -215,20 +215,18 @@ function EditQuestionForm({ editing, setEditing, topics, onSave }) {
                   }} />
                   <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-red)' }} onClick={() => upd('matrices', e.matrices.filter((_, i) => i !== mi))}><FiTrash2 size={12} /></button>
                 </div>
-                <table className="table" style={{ fontSize: '.85rem' }}>
+                <table className="matrix-table" onClick={e => { const input = e.target.closest('td')?.querySelector('input'); if (input) input.focus(); }}>
                   <tbody>
                     {(mt.data || []).map((row, ri) => (
                       <tr key={ri}>
                         {(row || []).map((cell, ci) => (
-                          <td key={ci} style={{ padding: 2 }}>
-                            <input className="input" style={{ width: '100%', padding: '2px 4px', fontSize: '.85rem' }} value={cell} onChange={ev => {
-                              const ms = [...e.matrices];
-                              const data = ms[mi].data.map(r => [...r]);
-                              data[ri][ci] = ev.target.value;
-                              ms[mi] = { ...ms[mi], data };
-                              upd('matrices', ms);
-                            }} />
-                          </td>
+                          <td key={ci}><input className="matrix-cell-input" style={{ width: 70, textAlign: 'center', fontSize: '.9rem' }} value={cell} placeholder="-" onChange={ev => {
+                            const ms = [...e.matrices];
+                            const data = ms[mi].data.map(r => [...r]);
+                            data[ri][ci] = ev.target.value;
+                            ms[mi] = { ...ms[mi], data };
+                            upd('matrices', ms);
+                          }} /></td>
                         ))}
                       </tr>
                     ))}
@@ -268,6 +266,11 @@ function EditQuestionForm({ editing, setEditing, topics, onSave }) {
           <div key={i} className="flex items-center gap-sm mb-2">
             <span className="option-letter-badge">{String.fromCharCode(65 + i)}</span>
             <input className="input" style={{ flex: 1 }} value={opt} onChange={ev => { const o = [...e.options]; o[i] = ev.target.value; upd('options', o); }} />
+            {opt.trim() && (
+              e.answerType === 'single'
+                ? <input type="radio" name="edit-correct" checked={e.correctSingle === opt} onChange={() => upd('correctSingle', opt)} title="Правильный ответ" />
+                : <input type="checkbox" checked={e.correctMultiple.includes(opt)} onChange={() => upd('correctMultiple', e.correctMultiple.includes(opt) ? e.correctMultiple.filter(x => x !== opt) : [...e.correctMultiple, opt])} title="Правильный ответ" />
+            )}
           </div>
         ))}
       </div>
@@ -277,18 +280,6 @@ function EditQuestionForm({ editing, setEditing, topics, onSave }) {
           <label className="flex items-center gap-xs"><input type="radio" checked={e.answerType === 'single'} onChange={() => upd('answerType', 'single')} /> Один</label>
           <label className="flex items-center gap-xs"><input type="radio" checked={e.answerType === 'multiple'} onChange={() => upd('answerType', 'multiple')} /> Несколько</label>
         </div>
-      </div>
-      <div className="form-group">
-        <label className="form-label">Правильный ответ</label>
-        {validOptions.map((opt, i) => (
-          <label key={i} className="flex items-center gap-xs">
-            {e.answerType === 'single'
-              ? <input type="radio" name="edit-correct" checked={e.correctSingle === opt} onChange={() => upd('correctSingle', opt)} />
-              : <input type="checkbox" checked={e.correctMultiple.includes(opt)} onChange={() => upd('correctMultiple', e.correctMultiple.includes(opt) ? e.correctMultiple.filter(x => x !== opt) : [...e.correctMultiple, opt])} />
-            }
-            <span>{opt}</span>
-          </label>
-        ))}
       </div>
       <div className="form-group">
         <label className="form-label">Баллы</label>
