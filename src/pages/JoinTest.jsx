@@ -37,6 +37,14 @@ export default function JoinTest() {
     if (joining) return;
     setJoining(true);
     const res = await api.joinTestByShare(shareToken);
+    
+    // Обработка ошибки 502 (бэкенд недоступен)
+    if (!res.ok && (res.status === 502 || res.data?.detail?.includes('502') || res.data?.detail?.toLowerCase().includes('bad gateway'))) {
+      setError('Сервис временно недоступен. Попробуйте позже.');
+      setJoining(false);
+      return;
+    }
+    
     if (res.ok) {
       // Преподаватель/админ по ссылке — на свою страницу
       if (res.data.role_restricted) {
@@ -62,9 +70,10 @@ export default function JoinTest() {
     }
   };
 
-  const handleLoginRedirect = () => {
+  const handleLoginRedirect = (isRegister) => {
     localStorage.setItem('pending_share_token', shareToken);
-    navigate('/login');
+    // isRegister=true -> форма регистрации, isRegister=false -> форма входа
+    navigate(`/login?mode=${isRegister ? 'register' : 'login'}`);
   };
 
   if (loading) {
@@ -147,14 +156,14 @@ export default function JoinTest() {
             <button
               className="btn btn-primary w-full"
               style={{ justifyContent: 'center', padding: '12px' }}
-              onClick={handleLoginRedirect}
+              onClick={() => handleLoginRedirect(false)}
             >
               <FiLogIn size={16} /> Войти и присоединиться
             </button>
             <button
               className="btn btn-secondary w-full"
               style={{ justifyContent: 'center', padding: '12px' }}
-              onClick={() => { localStorage.setItem('pending_share_token', shareToken); navigate('/login'); }}
+              onClick={() => handleLoginRedirect(true)}
             >
               <FiUserPlus size={16} /> Зарегистрироваться
             </button>
