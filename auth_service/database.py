@@ -34,7 +34,7 @@ def get_db():
 
 
 def get_groups_col():
-    """Return the 'groups' collection (admin-managed groups)."""
+    # Возвращает коллекцию групп
     get_db()  # ensure connection is established
     col = _client["testing_expert"]["groups"]
     col.create_index("name", unique=True)
@@ -42,13 +42,13 @@ def get_groups_col():
 
 
 def get_tests_col():
-    """Return the 'premade_tests' collection (shared with test_service)."""
+    # Возвращает коллекцию готовых тестов
     get_db()  # ensure connection
     return _client["testing_expert"]["premade_tests"]
 
 
 def ensure_demo_test():
-    """Create the introductory demo test if it doesn't exist."""
+    # Создание демо-теста для новых пользователей
     from datetime import datetime, timezone as tz
     col = get_tests_col()
     if col.find_one({"test_id": DEMO_TEST_ID}):

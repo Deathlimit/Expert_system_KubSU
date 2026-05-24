@@ -31,7 +31,7 @@ def get_col():
 
 
 def get_active_sessions_col():
-    """Return the 'active_sessions' collection for persistent test sessions."""
+    # Возвращает коллекцию активных сессий
     global _client
     if _client is None:
         get_col()  # ensure connection

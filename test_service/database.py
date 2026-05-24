@@ -25,15 +25,17 @@ def get_col():
             _client = None
             raise RuntimeError(f"Database connection failed: {e}")
         _client["testing_expert"]["premade_tests"].create_index("test_id", unique=True)
+        _client["testing_expert"]["premade_tests"].create_index("share_token", sparse=True, unique=True)
     return _client["testing_expert"]["premade_tests"]
 
 
 def get_users_col():
-    get_col()  # ensure _client is initialised
+    # Получение коллекции пользователей
+    get_col()
     return _client["testing_expert"]["users"]
 
 
 def clean(doc: dict) -> dict:
-    """Remove MongoDB _id from a document."""
+    # Удаление _id из документа
     doc.pop("_id", None)
     return doc

@@ -9,6 +9,7 @@ JWT_ALGORITHM = "HS256"
 _users_col = None
 
 def _get_users_col():
+    # Получение коллекции пользователей
     global _users_col
     if _users_col is None:
         from database import get_db
@@ -17,6 +18,7 @@ def _get_users_col():
     return _users_col
 
 
+# Проверка токена и получение текущего пользователя
 async def get_current_user(authorization: str = Header(...)):
     if not authorization.startswith("Bearer "):
         raise HTTPException(401, "Invalid authorization header")
@@ -26,7 +28,6 @@ async def get_current_user(authorization: str = Header(...)):
         raise HTTPException(401, "Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(401, "Invalid token")
-    # Skip tv check for internal service tokens
     if payload.get("sub", "").startswith("__service__"):
         return payload
     tv = payload.get("tv", 0)
@@ -37,5 +38,5 @@ async def get_current_user(authorization: str = Header(...)):
     except HTTPException:
         raise
     except Exception:
-        pass  # DB unavailable — allow request (fail-open for availability)
+        pass
     return payload

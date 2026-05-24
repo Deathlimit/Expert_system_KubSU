@@ -8,7 +8,7 @@ from database import get_col
 
 logger = logging.getLogger(__name__)
 
-# Default grading rules used when no custom criteria are defined
+# Критерии оценивания по умолчанию
 _DEFAULT_CRITERIA = [
     {"threshold_gte": 80, "description": "зачтено", "is_pass_status": True},
     {"threshold_gte": 50, "description": "удовлетворительно", "is_pass_status": True},
@@ -17,13 +17,7 @@ _DEFAULT_CRITERIA = [
 
 
 class TestSession:
-    """
-    Rule-based expert system session.
-
-    Knowledge base  : self.questions + self.grading_criteria
-    Inference engine: _evaluate_and_finish()
-    Rules           : _apply_criteria() — threshold IF-THEN chains
-    """
+    # Сессия тестирования (экспертная система)
 
     def __init__(
         self,
@@ -57,37 +51,32 @@ class TestSession:
         self._setup_categories()
 
     def _normalize_questions(self) -> None:
-        """Normalize different question key formats to a common internal format and shuffle options."""
+        # Нормализация формата вопросов и перемешивание вариантов
         for q in self.questions:
-            # Normalize question text: question_text / text -> question
             if "question" not in q and "question_text" in q:
                 q["question"] = q["question_text"]
             if "question" not in q and "text" in q:
                 q["question"] = q["text"]
-            # Normalize correct answer: correct_answer -> correct
             if "correct" not in q and "correct_answer" in q:
                 q["correct"] = q["correct_answer"]
-            # Shuffle answer options while keeping correct answer(s) mapped correctly
             self._shuffle_options(q)
 
     @staticmethod
     def _shuffle_options(q: dict) -> None:
-        """Shuffle option order; correct answer references stay valid."""
+        # Перемешивание вариантов ответов
         options = q.get("options")
         if not options or len(options) <= 1:
             return
         correct = q.get("correct")
         if correct is None:
             return
-        # Build index mapping: old_index -> option_text
         old_options = list(options)
         indices = list(range(len(old_options)))
         random.shuffle(indices)
         q["options"] = [old_options[i] for i in indices]
-        # No need to remap correct — correct stores option TEXT, not indices
 
     # ------------------------------------------------------------------
-    # Setup
+    # Настройка
     # ------------------------------------------------------------------
 
     def _setup_categories(self) -> None:
@@ -100,7 +89,7 @@ class TestSession:
             self.category_max_points[cat] += q.get("points", default_pts)
 
     # ------------------------------------------------------------------
-    # Public API
+    # Публичный API
     # ------------------------------------------------------------------
 
     def get_current_question(self) -> Optional[dict]:
@@ -125,18 +114,18 @@ class TestSession:
         return result
 
     def is_time_expired(self) -> bool:
+        # Проверка истечения времени
         if not self.time_limit_minutes:
             return False
         elapsed = (datetime.now() - self.start_time).total_seconds()
         return elapsed >= self.time_limit_minutes * 60
 
     def submit_answer(self, answer) -> dict:
+        # Обработка ответа пользователя
         if self.current_question_index >= len(self.questions):
             return {"finished": True, "error": "Нет больше вопросов."}
 
-        # Auto-finish if timer expired
         if self.is_time_expired():
-            # Fill missing answers as empty and finish
             while self.current_question_index < len(self.questions):
                 self.user_answers.append(None)
                 self.current_question_index += 1
@@ -170,33 +159,34 @@ class TestSession:
         return {"finished": False, "current_question": self.get_current_question()}
 
     # ------------------------------------------------------------------
-    # Helpers
+    # Вспомогательные методы
     # ------------------------------------------------------------------
 
     def _get_category(self, index: int) -> str:
+        # Получение категории вопроса
         if 0 <= index < len(self.questions):
             q = self.questions[index]
             return q.get("category") or q.get("topic", "unknown")
         return "unknown"
 
     # ------------------------------------------------------------------
-    # Expert System Inference Engine
+    # Движок экспертной системы
     # ------------------------------------------------------------------
 
     def _get_sorted_criteria(self) -> list:
-        """Return grading rules sorted from strictest to most lenient."""
+        # Получение отсортированных критериев
         rules = self.grading_criteria.get("topic_criteria") or _DEFAULT_CRITERIA
         return sorted(rules, key=lambda c: c.get("threshold_gte", 0), reverse=True)
 
     def _apply_criteria(self, pct: float, sorted_criteria: list) -> tuple:
-        """IF-THEN rule chain: return (status_description, is_pass) for a score percentage."""
+        # Применение критериев оценивания
         for rule in sorted_criteria:
             if pct >= rule.get("threshold_gte", 0):
                 return rule.get("description", "Статус не определен"), rule.get("is_pass_status", False)
         return "Статус не определен", False
 
     def _build_topics_status_raw(self) -> dict:
-        """Calculate raw per-category scores and percentages (no criteria applied)."""
+        # Расчёт баллов по категориям
         topics_status = {}
         for cat, max_pts in self.category_max_points.items():
             score = self.results.get(cat, 0)
@@ -215,7 +205,7 @@ class TestSession:
         return topics_status
 
     def _build_answers_list(self, hide_correct: bool = False) -> list:
-        """Build a per-question answer review for the result report."""
+        # Формирование списка ответов
         answers = []
         for i, q in enumerate(self.questions):
             user_ans = self.user_answers[i] if i < len(self.user_answers) else None
@@ -237,17 +227,18 @@ class TestSession:
         return answers
 
     def _save_result(self, result_detail: dict) -> None:
+        # Сохранение результата в БД
         try:
             get_col().insert_one(result_detail.copy())
         except Exception as e:
             logger.error("Failed to save test result for session %s: %s", self.session_id, e)
 
     # ------------------------------------------------------------------
-    # Serialization for MongoDB persistence
+    # Сериализация для MongoDB
     # ------------------------------------------------------------------
 
     def to_dict(self) -> dict:
-        """Serialize session state for MongoDB persistence."""
+        # Преобразование в словарь для сохранения
         return {
             "session_id": self.session_id,
             "username": self.username,
@@ -268,7 +259,7 @@ class TestSession:
 
     @classmethod
     def from_dict(cls, data: dict) -> "TestSession":
-        """Reconstruct a TestSession from a MongoDB document."""
+        # Восстановление из словаря
         obj = cls.__new__(cls)
         obj.session_id = data["session_id"]
         obj.username = data["username"]
@@ -290,7 +281,7 @@ class TestSession:
         return obj
 
     def get_past_questions(self) -> list:
-        """Return list of past questions for review (without correct answers)."""
+        # Получение списка предыдущих вопросов
         result = []
         for i in range(self.current_question_index):
             q = self.questions[i]
@@ -307,13 +298,7 @@ class TestSession:
         return result
 
     def _evaluate_and_finish(self, hide_correct: bool = False) -> dict:
-        """
-        Inference engine entry point.
-        Supports two grading modes:
-          - "overall":  apply criteria to the whole-test percentage → single verdict
-          - "per_topic": apply criteria per topic → test passes only if ALL topics pass
-        hide_correct: if True, correct answers are hidden from the result (for students)
-        """
+        # Завершение сессии и расчёт результатов
         self.end_time = datetime.now()
         duration = self.end_time - self.start_time
         self.formatted_duration = str(timedelta(seconds=round(duration.total_seconds())))
@@ -362,9 +347,8 @@ class TestSession:
         # Always compute score_pct for result_detail
         score_pct = round((self.correct_answers / len(self.questions)) * 100, 1) if self.questions else 0
 
-        # Hide correct answers for students
-        hide_correct = self.user_role == "student"
-
+        # Always save full answers (with correct_answer) to DB.
+        # Stripping for student-facing responses is handled by the router.
         result_detail = {
             "username": self.username,
             "test_name": self.test_name,
@@ -375,7 +359,7 @@ class TestSession:
             "category_scores": topics_status,
             "status": self.results["status_message"],
             "final_status": self.results["final_status"],
-            "answers": self._build_answers_list(hide_correct=hide_correct),
+            "answers": self._build_answers_list(hide_correct=False),
             "premade_test_id": self.premade_test_id,
             "grading_mode": self.grading_mode,
         }
