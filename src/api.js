@@ -229,6 +229,18 @@ export async function batchUpdateAssignments(testId, assignList, unassignList) {
 export async function generateTestByTopicScore(topic, maxScore) {
   return request('POST', `${TESTS}/generate`, { topic, max_score: maxScore });
 }
+export async function shareTest(testId) {
+  return request('POST', `${TESTS}/${testId}/share`);
+}
+export async function unshareTest(testId) {
+  return request('DELETE', `${TESTS}/${testId}/share`);
+}
+export async function getSharedTestInfo(shareToken) {
+  return request('GET', `${TESTS}/shared/${shareToken}`);
+}
+export async function joinTestByShare(shareToken) {
+  return request('POST', `${TESTS}/shared/${shareToken}/join`);
+}
 
 /* ── Content (Questions & Criteria) — Bulk Import ── */
 export async function bulkImportQuestions(questions) {

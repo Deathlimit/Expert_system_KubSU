@@ -26,7 +26,15 @@ export default function LoginPage() {
   }, [isRegister]);
 
   useEffect(() => {
-    if (user) navigate('/');
+    if (user) {
+      const pendingShare = localStorage.getItem('pending_share_token');
+      if (pendingShare) {
+        localStorage.removeItem('pending_share_token');
+        navigate(`/join/${pendingShare}`, { replace: true });
+      } else {
+        navigate('/');
+      }
+    }
   }, [user, navigate]);
 
   if (user) return null;
@@ -49,8 +57,15 @@ export default function LoginPage() {
     } else {
       const res = await loginUser(username, password);
       setLoading(false);
-      if (res.ok) navigate('/');
-      else setError(res.message);
+      if (res.ok) {
+        const pendingShare = localStorage.getItem('pending_share_token');
+        if (pendingShare) {
+          localStorage.removeItem('pending_share_token');
+          navigate(`/join/${pendingShare}`, { replace: true });
+        } else {
+          navigate('/');
+        }
+      } else setError(res.message);
     }
   };
 

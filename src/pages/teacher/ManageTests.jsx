@@ -5,7 +5,7 @@ import SortableTable from '../../components/SortableTable';
 import Modal from '../../components/Modal';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import * as api from '../../api';
-import { FiTrash2, FiPlus, FiUsers, FiBarChart2, FiDownload, FiSearch, FiSliders, FiCopy, FiEdit2, FiSettings, FiAlertTriangle } from 'react-icons/fi';
+import { FiTrash2, FiPlus, FiUsers, FiBarChart2, FiDownload, FiSearch, FiSliders, FiCopy, FiEdit2, FiSettings, FiAlertTriangle, FiShare2, FiX } from 'react-icons/fi';
 
 export default function ManageTests() {
   const [tab, setTab] = useState('manage');
@@ -38,6 +38,8 @@ function ManageTab() {
   const [showStats, setShowStats] = useState(false);
   const [showCriteria, setShowCriteria] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [shareToken, setShareToken] = useState(null);
+  const [shareLoading, setShareLoading] = useState(false);
 
   const loadTests = useCallback(async () => {
     setLoading(true);
@@ -59,6 +61,7 @@ function ManageTab() {
       if (!window.confirm('Есть несохранённые изменения назначений. Переключить тест?')) return;
     }
     setSelectedTest(test);
+    setShareToken(test.share_token || null);
     const assigned = new Set(test.assigned_students || []);
     setAssignedSet(assigned);
     setLocalAssigned(new Set(assigned));
@@ -138,6 +141,59 @@ function ManageTab() {
     }
   };
 
+  const handleShareToggle = async () => {
+    if (!selectedTest) return;
+    if (shareToken) {
+      // Revoke share link
+      setShareLoading(true);
+      const res = await api.unshareTest(selectedTest.test_id);
+      setShareLoading(false);
+      if (res.ok) {
+        setShareToken(null);
+        toast('Ссылка для приглашения отозвана', 'success');
+      } else {
+        toast(res.data?.detail || 'Ошибка', 'error');
+      }
+    } else {
+      // Generate share link
+      setShareLoading(true);
+      const res = await api.shareTest(selectedTest.test_id);
+      setShareLoading(false);
+      if (res.ok) {
+        setShareToken(res.data.share_token);
+        toast('Ссылка для приглашения создана', 'success');
+      } else {
+        toast(res.data?.detail || 'Ошибка', 'error');
+      }
+    }
+  };
+
+  const getShareUrl = () => {
+    if (!shareToken) return '';
+    if (import.meta.env.PROD) {
+      // HashRouter in production: domain.com/#/join/token
+      return `${window.location.origin}${window.location.pathname}#/join/${shareToken}`;
+    }
+    // BrowserRouter in dev: localhost:5173/join/token
+    return `${window.location.origin}/join/${shareToken}`;
+  };
+
+  const copyShareLink = () => {
+    const url = getShareUrl();
+    navigator.clipboard.writeText(url).then(() => {
+      toast('Ссылка скопирована в буфер обмена', 'success');
+    }).catch(() => {
+      // Fallback
+      const input = document.createElement('input');
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      toast('Ссылка скопирована', 'success');
+    });
+  };
+
   const handleDeleteQuestion = async (index) => {
     if (!selectedTest) return;
     if (!window.confirm('Удалить вопрос из теста?')) return;
@@ -193,9 +249,46 @@ function ManageTab() {
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowStats(true)}><FiBarChart2 size={14} /> Статистика</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowCriteria(true)}><FiSliders size={14} /> Критерии</button>
                 <button className="btn btn-secondary btn-sm" onClick={handleCloneTest}><FiCopy size={14} /> Клон</button>
+                <button className={`btn btn-sm ${shareToken ? 'btn-primary' : 'btn-secondary'}`} onClick={handleShareToggle}><FiShare2 size={14} /> {shareToken ? 'Ссылка' : 'Поделиться'}</button>
                 <button className="btn btn-danger btn-sm" onClick={handleDeleteTest}><FiTrash2 size={14} /> Удалить</button>
               </div>
             </div>
+
+            {/* Share link banner */}
+            {shareToken && (
+              <div style={{
+                margin: '.75rem 0',
+                padding: '.75rem 1rem',
+                borderRadius: 8,
+                background: 'rgba(59,130,246,.08)',
+                border: '1px solid rgba(59,130,246,.25)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '.75rem',
+                flexWrap: 'wrap',
+              }}>
+                <FiShare2 size={16} style={{ color: 'var(--color-blue, #3b82f6)', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, fontSize: '.85rem', marginBottom: 4, color: 'var(--color-blue, #3b82f6)' }}>Ссылка для приглашения</div>
+                  <div style={{
+                    fontSize: '.8rem',
+                    fontFamily: 'monospace',
+                    wordBreak: 'break-all',
+                    color: 'var(--text-secondary)',
+                    background: 'var(--bg-secondary)',
+                    padding: '.35rem .5rem',
+                    borderRadius: 4,
+                    border: '1px solid var(--border)',
+                  }}>
+                    {getShareUrl()}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0 }}>
+                  <button className="btn btn-primary btn-sm" onClick={copyShareLink}><FiCopy size={14} /> Копировать</button>
+                  <button className="btn btn-danger btn-sm" onClick={handleShareToggle} disabled={shareLoading}><FiX size={14} /> Отозвать</button>
+                </div>
+              </div>
+            )}
 
             {/* Questions in test */}
             <h3 style={{ fontSize: '.95rem', margin: '.75rem 0 .5rem' }}>Вопросы ({(selectedTest.questions || []).length})</h3>

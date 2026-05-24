@@ -3,6 +3,7 @@ import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import LoginPage from './pages/LoginPage';
+import JoinTest from './pages/JoinTest';
 import StudentDashboard from './pages/student/StudentDashboard';
 import TestTaking from './pages/student/TestTaking';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
@@ -28,6 +29,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/join/:shareToken" element={<JoinTest />} />
       <Route path="/student" element={<ProtectedRoute allowedRoles={['student', 'admin']}><StudentDashboard /></ProtectedRoute>} />
       <Route path="/student/test/:testId" element={<ProtectedRoute allowedRoles={['student', 'admin']}><TestTaking /></ProtectedRoute>} />
       <Route path="/teacher/*" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><TeacherDashboard /></ProtectedRoute>} />
