@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header
 
-from database import get_col, clean, CONTENT_SERVICE_URL, get_users_col
+from database import get_col, clean, CONTENT_SERVICE_URL, SESSION_SERVICE_URL, get_users_col
 from security import get_current_user, get_auth_header
 from models import CreateTestBody, AssignBody, BatchAssignBody, GenerateTestBody, AddQuestionsBody, RenameTestBody, UpdateTestSettingsBody
 
@@ -328,7 +328,7 @@ async def get_shared_test_info(share_token: str):
 
 # Присоединение к тесту по ссылке
 @router.post("/tests/shared/{share_token}/join")
-async def join_test_by_share(share_token: str, user=Depends(get_current_user)):
+async def join_test_by_share(share_token: str, authorization: str = Header(...), user=Depends(get_current_user)):
     t = get_col().find_one({"share_token": share_token}, {"_id": 0})
     if not t:
         raise HTTPException(404, "Ссылка недействительна или тест не найдена.")
@@ -337,6 +337,7 @@ async def join_test_by_share(share_token: str, user=Depends(get_current_user)):
     username = user["sub"]
     role = user.get("role", "student")
 
+    # Преподаватели не могут проходить тесты по ссылке
     if role not in ("student", "admin"):
         return {
             "test_id": test_id,
@@ -345,6 +346,38 @@ async def join_test_by_share(share_token: str, user=Depends(get_current_user)):
             "role_restricted": True,
             "message": "Преподаватели не могут проходить тесты по ссылке приглашения.",
         }
+
+    # Проверка: учетная запись не активирована
+    if role == "unassigned":
+        return {
+            "test_id": test_id,
+            "test_name": t.get("test_name", ""),
+            "already_assigned": False,
+            "account_not_activated": True,
+            "message": "Ваша учетная запись не активирована. Обратитесь к преподавателю.",
+        }
+
+    # Проверка: есть ли активная сессия для другого теста
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp_active = await client.get(
+                f"{SESSION_SERVICE_URL}/sessions/active",
+                headers=get_auth_header(authorization),
+            )
+            if resp_active.status_code == 200:
+                active_data = resp_active.json()
+                if active_data.get("active") and active_data.get("test_id") != test_id:
+                    return {
+                        "test_id": test_id,
+                        "test_name": t.get("test_name", ""),
+                        "already_assigned": False,
+                        "has_active_session": True,
+                        "active_test_id": active_data.get("test_id"),
+                        "active_test_name": active_data.get("test_name"),
+                        "message": "У вас уже есть активный тест. Завершите его прежде чем присоединяться к новому.",
+                    }
+    except httpx.RequestError:
+        pass  # Если сервис недоступен, продолжаем
 
     was_assigned = username in assigned
     if not was_assigned:
