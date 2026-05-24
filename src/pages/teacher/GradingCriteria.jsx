@@ -53,7 +53,7 @@ export default function GradingCriteria() {
         <p className="text-sm text-secondary mb-4">
           Настройте пороговые значения для оценки результатов тестирования. Критерии применяются в порядке убывания порога.
         </p>
-        <table className="table mb-4">
+        <table className="table criteria-table mb-4">
           <thead>
             <tr>
               <th style={{ width: 120 }}>Порог (%)</th>
@@ -65,19 +65,19 @@ export default function GradingCriteria() {
           <tbody>
             {criteria.map((c, i) => (
               <tr key={i}>
-                <td>
+                <td data-label="Порог (%)">
                   <input type="number" className="input" style={{ width: 90 }} min={0} max={100}
                     value={c.threshold_gte} onChange={e => updateRow(i, 'threshold_gte', +e.target.value)} />
                 </td>
-                <td>
+                <td data-label="Описание">
                   <input className="input" value={c.description || ''}
                     onChange={e => updateRow(i, 'description', e.target.value)} placeholder="Например: Отлично" />
                 </td>
-                <td style={{ textAlign: 'center' }}>
+                <td style={{ textAlign: 'center' }} data-label="Зачёт">
                   <input type="checkbox" checked={c.is_pass_status || false}
                     onChange={e => updateRow(i, 'is_pass_status', e.target.checked)} />
                 </td>
-                <td>
+                <td data-label="">
                   <button className="btn btn-ghost btn-sm" style={{ color: 'var(--color-red)' }}
                     onClick={() => removeRow(i)}><FiTrash2 size={14} /></button>
                 </td>

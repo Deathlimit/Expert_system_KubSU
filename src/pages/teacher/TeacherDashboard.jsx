@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Sidebar from '../../components/Sidebar';
 import { ToastProvider } from '../../components/Toast';
+import MobileTopbar from '../../components/MobileTopbar';
 import {
   FiPlusCircle, FiEdit, FiFileText, FiSettings,
   FiGrid, FiSliders, FiBarChart2, FiUpload
@@ -39,11 +40,14 @@ const sidebarLinks = [
 ];
 
 export default function TeacherDashboard() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <ToastProvider>
       <div className="page-layout">
-        <Sidebar links={sidebarLinks} />
+        <Sidebar links={sidebarLinks} isMobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+        <div className={`sidebar-overlay ${mobileMenuOpen ? 'show' : ''}`} onClick={() => setMobileMenuOpen(false)} />
         <main className="main-content">
+          <MobileTopbar title="Кабинет преподавателя" onMenu={() => setMobileMenuOpen(true)} />
           <Routes>
             <Route index element={<Navigate to="manage-tests" replace />} />
             <Route path="add-question" element={<AddQuestion />} />

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import Sidebar from '../../components/Sidebar';
 import SortableTable from '../../components/SortableTable';
 import { ToastProvider, useToast } from '../../components/Toast';
+import MobileTopbar from '../../components/MobileTopbar';
 import * as api from '../../api';
 import { FiPlay, FiClock, FiBookOpen, FiList, FiRefreshCw } from 'react-icons/fi';
 
@@ -18,6 +19,7 @@ function StudentContent() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSession, setActiveSession] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -91,10 +93,14 @@ function StudentContent() {
     ]}
   ];
 
+  const mobileTitle = tab === 'history' ? 'Моя история' : 'Назначенные тесты';
+
   return (
     <div className="page-layout">
-      <Sidebar links={sidebarLinks} />
+      <Sidebar links={sidebarLinks} isMobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+      <div className={`sidebar-overlay ${mobileMenuOpen ? 'show' : ''}`} onClick={() => setMobileMenuOpen(false)} />
       <main className="main-content">
+        <MobileTopbar title={mobileTitle} onMenu={() => setMobileMenuOpen(true)} />
         {tab === 'tests' && (
           <>
             <h1 className="page-title">Назначенные тесты</h1>

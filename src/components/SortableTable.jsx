@@ -33,7 +33,7 @@ export default function SortableTable({ columns, data, onRowClick, emptyText = '
 
   return (
     <div className="table-wrapper">
-      <table>
+      <table className="sortable-table">
         <thead>
           <tr>
             {columns.map((col) => (
@@ -50,7 +50,7 @@ export default function SortableTable({ columns, data, onRowClick, emptyText = '
           {sorted.map((row, i) => (
             <tr key={row._id || row.id || i} onClick={() => onRowClick?.(row)} style={onRowClick ? { cursor: 'pointer' } : undefined}>
               {columns.map((col) => (
-                <td key={col.key}>
+                <td key={col.key} data-label={col.label}>
                   {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
                 </td>
               ))}

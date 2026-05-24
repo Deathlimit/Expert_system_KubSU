@@ -227,9 +227,9 @@ function TestTakingContent() {
     const isPassed = results.final_status === 'Зачёт' || results.final_status === 'Passed';
     return (
       <div className="page-layout">
-        <main className="main-content" style={{ maxWidth: 600, margin: '0 auto', padding: '4rem 1.5rem', textAlign: 'center' }}>
+        <main className="main-content test-result-container">
           <h1 className="page-title">Тест завершён</h1>
-          <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
+          <div className="card test-result-card">
             <div style={{
               fontSize: '3.5rem',
               marginBottom: '0.75rem',
@@ -272,7 +272,7 @@ function TestTakingContent() {
 
   return (
     <div className="page-layout">
-      <main className="main-content" style={{ maxWidth: 800, margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <main className="main-content test-taking-container">
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div>

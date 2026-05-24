@@ -5,6 +5,7 @@ import Sidebar from '../../components/Sidebar';
 import SortableTable from '../../components/SortableTable';
 import Modal from '../../components/Modal';
 import { ToastProvider, useToast } from '../../components/Toast';
+import MobileTopbar from '../../components/MobileTopbar';
 import * as api from '../../api';
 import {
   FiUsers, FiPlusCircle, FiEdit, FiFileText,
@@ -47,11 +48,14 @@ const sidebarLinks = [
 ];
 
 export default function AdminDashboard() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <ToastProvider>
       <div className="page-layout">
-        <Sidebar links={sidebarLinks} />
+        <Sidebar links={sidebarLinks} isMobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+        <div className={`sidebar-overlay ${mobileMenuOpen ? 'show' : ''}`} onClick={() => setMobileMenuOpen(false)} />
         <main className="main-content">
+          <MobileTopbar title="Панель администратора" onMenu={() => setMobileMenuOpen(true)} />
           <Routes>
             <Route index element={<Navigate to="users" replace />} />
             <Route path="users" element={<UserManagement />} />
@@ -224,6 +228,8 @@ function GroupManagement() {
   const [groups, setGroups] = useState([]);
   const [newGroup, setNewGroup] = useState('');
   const [loading, setLoading] = useState(true);
+  const [editingGroup, setEditingGroup] = useState(null);
+  const [editValue, setEditValue] = useState('');
 
   const loadGroups = async () => {
     setLoading(true);
@@ -247,7 +253,7 @@ function GroupManagement() {
   };
 
   const handleDelete = async (name) => {
-    if (!window.confirm(`Удалить группу \"${name}\"?`)) return;
+    if (!window.confirm(`Удалить группу "${name}"?`)) return;
     const res = await api.deleteGroup(name);
     if (res.ok) {
       toast('Группа удалена', 'success');
@@ -255,6 +261,25 @@ function GroupManagement() {
     } else {
       toast(res.data?.detail || 'Ошибка', 'error');
     }
+  };
+
+  const handleRename = async (oldName) => {
+    const newName = editValue.trim();
+    if (!newName) { toast('Введите название группы', 'error'); return; }
+    if (newName === oldName) { setEditingGroup(null); return; }
+    const res = await api.renameGroup(oldName, newName);
+    if (res.ok) {
+      toast('Группа переименована', 'success');
+      setEditingGroup(null);
+      loadGroups();
+    } else {
+      toast(res.data?.detail || 'Ошибка', 'error');
+    }
+  };
+
+  const startRename = (group) => {
+    setEditingGroup(group);
+    setEditValue(group);
   };
 
   if (loading) return <p className="text-secondary">Загрузка...</p>;
@@ -273,8 +298,21 @@ function GroupManagement() {
           <div className="flex flex-col gap-xs">
             {groups.map(g => (
               <div key={g} className="flex items-center" style={{ justifyContent: 'space-between', padding: '.5rem .75rem', borderRadius: 6, border: '1px solid var(--border)' }}>
-                <span>{g}</span>
-                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(g)}>Удалить</button>
+                {editingGroup === g ? (
+                  <div className="flex items-center gap-sm">
+                    <input className="input" style={{ maxWidth: 200 }} value={editValue} onChange={e => setEditValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRename(g)} autoFocus />
+                    <button className="btn btn-primary btn-sm" onClick={() => handleRename(g)}>Сохранить</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingGroup(null)}>Отмена</button>
+                  </div>
+                ) : (
+                  <>
+                    <span>{g}</span>
+                    <div className="flex items-center gap-xs">
+                      <button className="btn btn-secondary btn-sm" onClick={() => startRename(g)}>Переименовать</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDelete(g)}>Удалить</button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

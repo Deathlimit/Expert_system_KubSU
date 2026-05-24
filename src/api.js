@@ -145,6 +145,9 @@ export async function createGroup(name) {
 export async function deleteGroup(name) {
   return request('DELETE', `${AUTH}/groups/${encodeURIComponent(name)}`);
 }
+export async function renameGroup(oldName, newName) {
+  return request('PUT', `${AUTH}/groups/${encodeURIComponent(oldName)}`, { name: newName });
+}
 
 /* ── Content (Questions & Criteria) ── */
 export async function getQuestions() {
@@ -195,8 +198,8 @@ export async function getTestById(testId) {
 export async function getAssignedTests(studentUsername) {
   return request('GET', `${TESTS}/assigned/${encodeURIComponent(studentUsername)}`);
 }
-export async function createTest(testName, questions, timeLimitMinutes, cooldownHours, maxAttempts) {
-  const body = { test_name: testName, questions };
+export async function createTest(testName, questions, timeLimitMinutes, cooldownHours, maxAttempts, gradingMode = 'overall') {
+  const body = { test_name: testName, questions, grading_mode: gradingMode };
   if (timeLimitMinutes) body.time_limit_minutes = timeLimitMinutes;
   if (cooldownHours != null) body.cooldown_hours = cooldownHours;
   if (maxAttempts) body.max_attempts = maxAttempts;

@@ -2,6 +2,29 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ─── Manage Tests layout helpers ─── */
+.tests-manage-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.tests-list-card {
+  width: 280px;
+  flex-shrink: 0;
+}
+.tests-list-scroll { max-height: 60vh; overflow-y: auto; }
+.tests-details { flex: 1; min-width: 0; }
+.test-header-row { justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.test-actions { flex-wrap: wrap; justify-content: flex-end; }
+.questions-scroll { max-height: 30vh; overflow-y: auto; }
+.assignments-scroll { max-height: 25vh; overflow-y: auto; }
+.section-title { margin-bottom: .75rem; font-size: .95rem; }
+.test-meta { max-width: 720px; line-height: 1.4; }
+.create-test-layout { display: flex; gap: 16px; align-items: flex-start; }
+.create-test-settings { width: 300px; flex-shrink: 0; }
+.create-test-picker { flex: 1; min-width: 0; }
+.generate-test-actions { max-width: 500px; }
+
 :root {
   --font: 'Inter', system-ui, -apple-system, sans-serif;
   --radius: 10px;
@@ -112,6 +135,12 @@ body {
   overflow-y: auto;
   z-index: 100;
 }
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .sidebar-brand {
   font-size: 1.2rem;
   font-weight: 700;
@@ -122,6 +151,19 @@ body {
   gap: 10px;
 }
 .sidebar-brand svg { flex-shrink: 0; }
+.sidebar-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.sidebar-close:hover { background: var(--bg-hover); }
 .sidebar-section-label {
   font-size: .7rem;
   font-weight: 600;
@@ -179,6 +221,61 @@ body {
 }
 .sidebar-user-name { font-weight: 600; font-size: .9rem; }
 .sidebar-user-role { font-size: .75rem; color: var(--text-secondary); }
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+  z-index: 90;
+}
+.sidebar-overlay.show { opacity: 1; pointer-events: auto; }
+
+.mobile-topbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 6px 18px;
+  position: sticky;
+  top: 0;
+  background: linear-gradient(135deg, var(--bg-card), var(--bg));
+  z-index: 60;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.mobile-topbar-title { display: flex; flex-direction: column; line-height: 1.2; }
+.mobile-brand { font-weight: 800; letter-spacing: .5px; font-size: 1.05rem; }
+.mobile-topbar-sub { color: var(--text-secondary); font-size: .9rem; }
+.mobile-topbar-actions { display: flex; align-items: center; gap: 10px; }
+.mobile-icon-btn {
+  width: 38px; height: 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text);
+  transition: background var(--transition);
+}
+.mobile-icon-btn:hover { background: var(--bg-hover); }
+.mobile-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--bg-accent);
+  color: var(--text-on-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: .85rem;
+  box-shadow: var(--shadow);
+}
 
 .main-content {
   margin-left: 260px;
@@ -456,6 +553,21 @@ tr:hover td { background: var(--table-hover); }
 }
 
 /* ─── Test taking ─── */
+.test-taking-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+.test-result-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+  text-align: center;
+}
+.test-result-card {
+  padding: 2.5rem;
+  text-align: center;
+}
 .question-card {
   max-width: 800px;
   margin: 0 auto;
@@ -606,8 +718,213 @@ tr:hover td { background: var(--table-hover); }
 
 /* ─── Responsive ─── */
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .main-content { margin-left: 0; padding: 16px; }
+  .page-layout { flex-direction: column; }
+  .sidebar {
+    display: flex;
+    transform: translateX(-100%);
+    width: min(320px, 82vw);
+    box-shadow: var(--shadow-lg);
+    transition: transform var(--transition);
+    background: linear-gradient(180deg, var(--bg-sidebar), var(--bg));
+    backdrop-filter: blur(12px);
+  }
+  .sidebar.sidebar-mobile-open { transform: translateX(0); }
+  .sidebar-close { display: inline-flex; }
+  .main-content { margin-left: 0; padding: 16px; width: 100%; }
+  .mobile-topbar { display: flex; }
+  .card { padding: 18px; border-radius: 14px; }
+  .page-title { font-size: 1.28rem; margin-bottom: 14px; }
+  .form-row { flex-direction: column; gap: 12px; }
+  .form-group { gap: 6px; }
+  .tabs { overflow-x: auto; overflow-y: hidden; }
+  .tab { padding: 10px 12px; white-space: nowrap; }
+  .test-item { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .test-item button { width: 100%; justify-content: center; }
+  .question-card { padding: 1.25rem; }
+  .question-text { font-size: 1.05rem; }
+  .nav-dot { width: 32px; height: 32px; font-size: .8rem; }
+  .nav-dots, .question-dots { flex-wrap: nowrap; overflow-x: auto; padding: 8px 4px; margin: 12px -4px; }
+  .nav-dots::-webkit-scrollbar, .question-dots::-webkit-scrollbar { height: 6px; }
+  .options-list { gap: 10px; }
+  .option-btn { align-items: center; }
+  .toast-container { right: 12px; left: 12px; }
+
+  /* Manage Tests on mobile */
+  .tests-manage-layout { flex-direction: column; }
+  .tests-list-card { width: 100%; }
+  .tests-list-scroll { max-height: none; overflow-y: visible; }
+  .tests-details { width: 100%; }
+  .test-header-row { flex-direction: column; align-items: flex-start; }
+  .test-actions { width: 100%; gap: 8px; flex-wrap: wrap; }
+  .test-actions .btn { flex: 1; justify-content: center; }
+  .questions-scroll { max-height: none; }
+  .assignments-scroll { max-height: 40vh; }
+
+  /* Create test two-panel to stack */
+  .create-test-layout { flex-direction: column; }
+  .create-test-settings { width: 100%; }
+  .create-test-picker { width: 100%; }
+
+  /* Tables become cards */
+  .table-wrapper { overflow: visible; }
+  .sortable-table, .table-wrapper table { border-collapse: separate; border-spacing: 0; }
+  .sortable-table thead { display: none; }
+  .sortable-table tr { display: block; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; box-shadow: var(--shadow); background: var(--bg-card); }
+  .sortable-table td { display: block; padding: 6px 0; border: 0; }
+  .sortable-table td::before { content: attr(data-label); display: block; font-weight: 600; font-size: .8rem; color: var(--text-secondary); margin-bottom: 2px; }
+  .sortable-table td:last-child { margin-bottom: 0; }
+  .sortable-table .sort-arrow { display: none; }
+  .sortable-table td > * { max-width: 100%; }
+  .sortable-table select, .sortable-table input { width: 100%; }
+  .sortable-table td .btn { width: auto; }
+  .sortable-table td .flex { flex-wrap: wrap; gap: 6px; }
+
+  /* Raw tables: horizontal scroll, keep header */
+  .table { display: block; overflow-x: auto; }
+  .table thead { display: table-header-group; }
+  .table tr { display: table-row; border: none; border-radius: 0; padding: 0; margin-bottom: 0; box-shadow: none; background: none; }
+  .table td { display: table-cell; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .table td::before { content: none; }
+  .table th { display: table-cell; }
+
+  /* Modal on mobile */
+  .modal { padding: 20px; width: 96%; max-height: 85vh; }
+  .modal-lg, .modal-xl { max-width: 100%; }
+  .modal-footer { flex-wrap: wrap; }
+  .modal-footer .btn { flex: 1; min-width: 100px; }
+
+  /* Wakeup card on mobile */
+  .wakeup-card { padding: 28px 24px; margin: 16px; max-width: 360px; }
+  .wakeup-card h3 { font-size: 1.1rem; }
+
+  /* Test containers on mobile */
+  .test-taking-container,
+  .test-result-container { padding: 1rem; }
+  .test-result-container { padding-top: 2rem; }
+  .test-result-card { padding: 1.5rem 1rem; }
+
+  /* Timer badge */
+  .timer-badge { padding: 6px 12px; font-size: .85rem; }
+
+  /* Matrix horizontal scroll */
+  .matrix-container { overflow-x: auto; padding-bottom: 4px; }
+  .matrix-block { min-width: fit-content; }
+
+  /* Question pick items */
+  .question-pick-item { padding: 8px 10px; font-size: .85rem; }
+
+  /* Checkbox rows — larger tap target */
+  .checkbox-row { padding: 10px 0; }
+  .checkbox-row input[type="checkbox"] { width: 20px; height: 20px; }
+
+  /* Assignments checkboxes */
+  .assignments-scroll label { padding: 8px 0; min-height: 40px; }
+  .assignments-scroll input[type="checkbox"] { width: 18px; height: 18px; }
+
+  /* Flex rows wrap on mobile */
+  .flex.items-center.gap-sm,
+  .flex.items-center.gap-md,
+  .flex.gap-sm,
+  .flex.gap-md,
+  .flex.gap-xs { flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+  .mobile-topbar { padding: 10px 2px 14px; }
+  .mobile-brand { font-size: 1rem; }
+  .card { padding: 14px; }
+  .btn-icon, .mobile-icon-btn { width: 34px; height: 34px; }
+  .test-item { padding: 12px; }
+  .question-card { padding: 1rem; }
+  .question-dots { justify-content: flex-start; }
+  .option-btn { padding: 12px 14px; }
+  .sidebar { width: min(320px, 86vw); }
+
+  /* Buttons: only form-submit and standalone actions go full-width */
+  .login-form .btn,
+  .wakeup-card .btn,
+  .empty-state + .btn,
+  .modal-footer .btn { width: 100%; justify-content: center; }
+
+  /* Button groups stay inline, wrap if needed */
+  .modal-footer { flex-wrap: wrap; }
+  .modal-footer .btn { flex: 1; min-width: 120px; }
+
+  /* Login card */
+  .login-card { padding: 24px; }
+  .login-title { font-size: 1.3rem; }
+
+  /* Modal */
+  .modal { padding: 18px; width: 98%; }
+  .modal-header { margin-bottom: 14px; }
+  .modal-title { font-size: 1.05rem; }
+
+  /* Wakeup */
+  .wakeup-card { padding: 24px 20px; margin: 12px; }
+
+  /* Test actions bar — stack vertically */
+  .test-actions { flex-direction: column; width: 100%; }
+  .test-actions .btn { width: 100%; justify-content: center; }
+
+  /* Page title */
+  .page-title { font-size: 1.2rem; }
+
+  /* Test taking header */
+  .test-taking-container .timer-badge { font-size: .8rem; padding: 5px 10px; }
+
+  /* Result page stats */
+  .test-result-card > div:last-child { gap: 1.25rem; }
+}
+
+/* ─── iPhone SE / very small screens ─── */
+@media (max-width: 380px) {
+  .main-content { padding: 12px; }
+  .card { padding: 12px; }
+  .page-title { font-size: 1.1rem; margin-bottom: 10px; }
+  .mobile-topbar { padding: 8px 0 12px; }
+  .mobile-brand { font-size: .95rem; }
+  .mobile-icon-btn { width: 32px; height: 32px; }
+  .mobile-avatar { width: 30px; height: 30px; font-size: .75rem; }
+
+  /* Tabs */
+  .tab { padding: 8px 10px; font-size: .82rem; }
+
+  /* Test item */
+  .test-item { padding: 10px; }
+
+  /* Modal */
+  .modal { padding: 14px; }
+  .modal-header { margin-bottom: 10px; }
+  .modal-title { font-size: .95rem; }
+
+  /* Test taking */
+  .question-text { font-size: .95rem; }
+  .option-btn { padding: 10px 12px; font-size: .88rem; }
+  .option-letter { width: 28px; height: 28px; font-size: .78rem; }
+  .nav-dot { width: 28px; height: 28px; font-size: .75rem; }
+  .q-dot { width: 28px; height: 28px; font-size: .72rem; }
+
+  /* Result card */
+  .test-result-card { padding: 1rem .75rem; }
+  .test-result-card > div:last-child { gap: 1rem; }
+
+  /* Toast */
+  .toast { min-width: auto; font-size: .82rem; padding: 10px 14px; }
+
+  /* Test actions */
+  .test-actions .btn { font-size: .8rem; padding: 7px 10px; }
+
+  /* Sidebar */
+  .sidebar { width: min(300px, 88vw); }
+  .sidebar-brand { font-size: 1.05rem; padding: 6px 10px 16px; }
+  .sidebar-link { padding: 8px 10px; font-size: .88rem; }
+
+  /* Flex containers inside cards */
+  .card .flex.items-center { flex-wrap: wrap; gap: 8px; }
+
+  /* Prevent cards from overflowing on tiny screens */
+  .card[style*="min-width"],
+  .card[style*="minWidth"] { min-width: auto !important; max-width: 100%; }
 }
 
 /* ─── Question card (test-taking) ─── */

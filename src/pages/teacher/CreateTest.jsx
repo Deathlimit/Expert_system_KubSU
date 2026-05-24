@@ -15,6 +15,7 @@ export default function CreateTest() {
   const [timeLimit, setTimeLimit] = useState(0);
   const [cooldown, setCooldown] = useState(24);
   const [maxAttempts, setMaxAttempts] = useState(0);
+  const [gradingMode, setGradingMode] = useState('overall');
   const [saving, setSaving] = useState(false);
   const [pendingCriteria, setPendingCriteria] = useState(null);
   const [showCriteria, setShowCriteria] = useState(false);
@@ -59,7 +60,8 @@ export default function CreateTest() {
       selectedQuestions,
       timeLimit || null,
       cooldown,
-      maxAttempts || null
+      maxAttempts || null,
+      gradingMode
     );
     setSaving(false);
 
@@ -81,9 +83,9 @@ export default function CreateTest() {
   return (
     <>
       <h1 className="page-title">Создать готовый тест</h1>
-      <div className="flex gap-md" style={{ alignItems: 'flex-start' }}>
+      <div className="create-test-layout">
         {/* Settings panel */}
-        <div className="card" style={{ width: 300, flexShrink: 0 }}>
+        <div className="card create-test-settings">
           <h3 style={{ marginBottom: '.75rem' }}>Параметры теста</h3>
           <div className="form-group">
             <label className="form-label">Название теста</label>
@@ -101,6 +103,13 @@ export default function CreateTest() {
             <label className="form-label">Макс. попыток (0 = безлимит)</label>
             <input type="number" className="input" min={0} max={100} value={maxAttempts} onChange={e => setMaxAttempts(+e.target.value)} />
           </div>
+          <div className="form-group">
+            <label className="form-label">Режим оценки</label>
+            <select className="select" value={gradingMode} onChange={e => setGradingMode(e.target.value)}>
+              <option value="overall">Общий (по всему тесту)</option>
+              <option value="per_topic">По темам (все темы должны быть зачтены)</option>
+            </select>
+          </div>
           <div className="text-sm text-secondary mb-2">Выбрано вопросов: <strong>{selectedIds.size}</strong></div>
           <button className="btn btn-secondary mb-2" style={{ width: '100%' }} onClick={() => setShowCriteria(true)}>
             <FiSliders size={16} /> {pendingCriteria ? 'Изменить критерии' : 'Настроить критерии'}
@@ -112,7 +121,7 @@ export default function CreateTest() {
         </div>
 
         {/* Question picker */}
-        <div style={{ flex: 1 }}>
+        <div className="create-test-picker">
           <div className="flex items-center gap-sm mb-4">
             <FiFilter size={16} className="text-secondary" />
             <select className="select" value={topicFilter} onChange={e => setTopicFilter(e.target.value)}>

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiSun, FiMoon, FiLogOut, FiLock } from 'react-icons/fi';
+import { FiSun, FiMoon, FiLogOut, FiLock, FiX } from 'react-icons/fi';
 import * as api from '../api';
 
-export default function Sidebar({ links }) {
+export default function Sidebar({ links, isMobileOpen = false, onClose }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -14,17 +14,38 @@ export default function Sidebar({ links }) {
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
+  useEffect(() => {
+    if (isMobileOpen && onClose) onClose();
+    // Close mobile sidebar after route change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const handleItemClick = (item) => {
+    if (item.onClick) item.onClick();
+    else if (item.path) navigate(item.path);
+    if (onClose) onClose();
+  };
+
   const roleLabels = { student: 'Студент', teacher: 'Преподаватель', admin: 'Администратор' };
 
   return (
-    <nav className="sidebar">
-      <div className="sidebar-brand">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
-        </svg>
-        Тестирование
+    <nav className={`sidebar ${isMobileOpen ? 'sidebar-mobile-open' : ''}`}>
+      <div className="sidebar-brand-row">
+        <div className="sidebar-brand">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+          Тестирование
+        </div>
+        <button
+          className="sidebar-close"
+          aria-label="Закрыть меню"
+          onClick={() => onClose?.()}
+        >
+          <FiX size={18} />
+        </button>
       </div>
 
       {links.map((section, si) => (
@@ -34,7 +55,7 @@ export default function Sidebar({ links }) {
             <button
               key={item.path || item.id}
               className={`sidebar-link ${item.active != null ? (item.active ? 'active' : '') : (item.path && location.pathname.startsWith(item.path) ? 'active' : '')}`}
-              onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
+              onClick={() => handleItemClick(item)}
             >
               {item.icon} {item.text}
             </button>

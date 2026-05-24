@@ -154,11 +154,11 @@ function ManageTab() {
   if (loading) return <p className="text-secondary">Загрузка...</p>;
 
   return (
-    <div className="flex gap-md" style={{ alignItems: 'flex-start' }}>
+    <div className="tests-manage-layout">
       {/* Test list */}
-      <div className="card" style={{ width: 280, flexShrink: 0 }}>
-        <h3 style={{ marginBottom: '.75rem', fontSize: '.95rem' }}>Тесты</h3>
-        <div className="flex flex-col gap-xs" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+      <div className="card tests-list-card">
+        <h3 className="section-title">Тесты</h3>
+        <div className="flex flex-col gap-xs tests-list-scroll">
           {tests.map(t => (
             <button key={t.test_id}
               className={`sidebar-item ${selectedTest?.test_id === t.test_id ? 'sidebar-item-active' : ''}`}
@@ -174,11 +174,20 @@ function ManageTab() {
 
       {/* Details panel */}
       {selectedTest ? (
-        <div style={{ flex: 1 }}>
+        <div className="tests-details">
           <div className="card mb-4">
-            <div className="flex items-center" style={{ justifyContent: 'space-between', marginBottom: '.75rem' }}>
-              <h2 style={{ fontSize: '1.1rem' }}>{selectedTest.test_name}</h2>
-              <div className="flex gap-xs">
+            <div className="flex items-center test-header-row">
+              <div className="flex flex-col" style={{ gap: 4 }}>
+                <h2 style={{ fontSize: '1.1rem' }}>{selectedTest.test_name}</h2>
+                <div className="text-sm text-secondary test-meta">
+                  Создатель: {selectedTest.creator_full_name || selectedTest.creator_username} • Дата: {selectedTest.creation_date || '—'}
+                  {selectedTest.time_limit_minutes ? ` • ${selectedTest.time_limit_minutes} мин` : ' • Без ограничения времени'}
+                  {' • Кулдаун: '}{selectedTest.cooldown_hours != null ? `${selectedTest.cooldown_hours} ч` : '24 ч'}
+                  {selectedTest.max_attempts ? ` • Попыток: ${selectedTest.max_attempts}` : ' • Попытки: ∞'}
+                  {' • Режим: '}{selectedTest.grading_mode === 'per_topic' ? 'По темам' : 'Общий'}
+                </div>
+              </div>
+              <div className="flex gap-xs test-actions">
                 <button className="btn btn-secondary btn-sm" onClick={handleRenameTest}><FiEdit2 size={14} /> Переименовать</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)}><FiSettings size={14} /> Настройки</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => setShowStats(true)}><FiBarChart2 size={14} /> Статистика</button>
@@ -187,16 +196,10 @@ function ManageTab() {
                 <button className="btn btn-danger btn-sm" onClick={handleDeleteTest}><FiTrash2 size={14} /> Удалить</button>
               </div>
             </div>
-            <div className="text-sm text-secondary mb-2">
-              Создатель: {selectedTest.creator_full_name || selectedTest.creator_username} • Дата: {selectedTest.creation_date || '—'}
-              {selectedTest.time_limit_minutes ? ` • ${selectedTest.time_limit_minutes} мин` : ' • Без ограничения времени'}
-              {' • Кулдаун: '}{selectedTest.cooldown_hours != null ? `${selectedTest.cooldown_hours} ч` : '24 ч'}
-              {selectedTest.max_attempts ? ` • Попыток: ${selectedTest.max_attempts}` : ' • Попытки: ∞'}
-            </div>
 
             {/* Questions in test */}
             <h3 style={{ fontSize: '.95rem', margin: '.75rem 0 .5rem' }}>Вопросы ({(selectedTest.questions || []).length})</h3>
-            <div className="flex flex-col gap-xs" style={{ maxHeight: '30vh', overflowY: 'auto' }}>
+            <div className="flex flex-col gap-xs questions-scroll">
               {(selectedTest.questions || []).map((q, i) => (
                 <div key={i} className="flex items-center gap-sm" style={{ padding: '.4rem .6rem', borderRadius: 6, background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
                   <span className="text-sm" style={{ flex: 1 }}>{i + 1}. [{q.topic || q.category}] {q.question}</span>
@@ -219,7 +222,7 @@ function ManageTab() {
                 {filteredStudents.every(s => localAssigned.has(s.username)) ? 'Снять группу' : 'Назначить группу'}
               </button>}
             </div>
-            <div style={{ maxHeight: '25vh', overflowY: 'auto' }}>
+            <div className="assignments-scroll">
               {filteredStudents.map(s => (
                 <label key={s.username} className="flex items-center gap-xs" style={{ padding: '4px 0' }}>
                   <input type="checkbox" checked={localAssigned.has(s.username)} onChange={() => toggleStudent(s.username)} />
@@ -405,17 +408,35 @@ function StatisticsModal({ testId, testName, onClose }) {
       {loading ? <p className="text-secondary">Загрузка...</p> : (
         <>
           {stats && (
-            <div className="flex items-center gap-md mb-4" style={{ flexWrap: 'wrap' }}>
-              <div className="badge badge-neutral">Попыток: {stats.total_attempts}</div>
-              <div className="badge badge-neutral">Студентов: {stats.unique_students}</div>
-              <div className="badge badge-green">Средний балл: {stats.average_score}%</div>
-              <div className="badge badge-green">Зачёт: {stats.pass_rate}%</div>
-              <div className="badge badge-neutral">Лучший: {stats.best_score}%</div>
-              <div className="badge badge-neutral">Худший: {stats.worst_score}%</div>
-              <div style={{ marginLeft: 'auto' }}>
-                <button className="btn btn-secondary btn-sm" onClick={exportCSV}><FiDownload size={14} /> CSV</button>
+            <>
+              <div className="flex items-center gap-md mb-4" style={{ flexWrap: 'wrap' }}>
+                <div className="badge badge-neutral">Попыток: {stats.total_attempts}</div>
+                <div className="badge badge-neutral">Студентов: {stats.unique_students}</div>
+                <div className="badge badge-green">Средний балл: {stats.average_score}%</div>
+                <div className="badge badge-green">Зачёт: {stats.pass_rate}%</div>
+                <div className="badge badge-neutral">Лучший: {stats.best_score}%</div>
+                <div className="badge badge-neutral">Худший: {stats.worst_score}%</div>
+                <div style={{ marginLeft: 'auto' }}>
+                  <button className="btn btn-secondary btn-sm" onClick={exportCSV}><FiDownload size={14} /> CSV</button>
+                </div>
               </div>
-            </div>
+              {stats.per_topic && Object.keys(stats.per_topic).length > 0 && (
+                <div className="card mb-4" style={{ padding: '1rem', background: 'var(--bg-secondary)' }}>
+                  <h4 style={{ fontSize: '.9rem', marginBottom: '.75rem' }}>По темам</h4>
+                  <div className="flex flex-col gap-sm">
+                    {Object.entries(stats.per_topic).map(([topic, t]) => (
+                      <div key={topic} className="flex items-center gap-sm" style={{ flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, minWidth: 140, fontSize: '.85rem' }}>{topic}</span>
+                        <span className="badge badge-neutral">Средний: {t.average}%</span>
+                        <span className="badge badge-green">Лучший: {t.best}%</span>
+                        <span className="badge badge-red">Худший: {t.worst}%</span>
+                        <span className="text-xs text-secondary">({t.attempts} попыток)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
           {!stats && (
             <div className="flex items-center gap-md mb-4">
@@ -445,7 +466,22 @@ function StatisticsModal({ testId, testName, onClose }) {
             <p><strong>Тест:</strong> {detailResult.test_name}</p>
             <p><strong>Результат:</strong> {detailResult.final_status} ({detailResult.score_percentage?.toFixed(1)}%)</p>
             <p><strong>Длительность:</strong> {detailResult.duration}</p>
+            {detailResult.grading_mode && <p><strong>Режим оценки:</strong> {detailResult.grading_mode === 'per_topic' ? 'По темам' : 'Общий'}</p>}
           </div>
+          {detailResult.category_scores && Object.keys(detailResult.category_scores).length > 0 && (
+            <div className="mt-2">
+              <h4 style={{ marginBottom: '.5rem' }}>По темам</h4>
+              <div className="flex flex-col gap-xs">
+                {Object.entries(detailResult.category_scores).map(([cat, info]) => (
+                  <div key={cat} className="flex items-center gap-sm" style={{ flexWrap: 'wrap', fontSize: '.85rem' }}>
+                    <span style={{ fontWeight: 600, minWidth: 120 }}>{cat}</span>
+                    <span className="badge badge-neutral">{info.score}/{info.total} ({info.percentage}%)</span>
+                    <span className={`badge ${info.status && info.status !== 'незачтено' ? 'badge-green' : 'badge-red'}`}>{info.status || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {detailResult.answers && detailResult.answers.length > 0 && (
             <div className="mt-2">
               <h4 style={{ marginBottom: '.5rem' }}>Ответы</h4>
@@ -537,6 +573,7 @@ function TestSettingsModal({ test, onClose, onSaved }) {
   const [timeLimit, setTimeLimit] = useState(test.time_limit_minutes || 0);
   const [cooldown, setCooldown] = useState(test.cooldown_hours != null ? test.cooldown_hours : 24);
   const [maxAttempts, setMaxAttempts] = useState(test.max_attempts || 0);
+  const [gradingMode, setGradingMode] = useState(test.grading_mode || 'overall');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -545,6 +582,7 @@ function TestSettingsModal({ test, onClose, onSaved }) {
       time_limit_minutes: timeLimit > 0 ? timeLimit : null,
       cooldown_hours: cooldown,
       max_attempts: maxAttempts > 0 ? maxAttempts : null,
+      grading_mode: gradingMode,
     });
     setSaving(false);
     if (res.ok) { toast('Настройки сохранены', 'success'); onSaved(); onClose(); }
@@ -568,6 +606,14 @@ function TestSettingsModal({ test, onClose, onSaved }) {
           <label className="form-label">Максимальное количество попыток</label>
           <input type="number" className="input" min={0} value={maxAttempts} onChange={e => setMaxAttempts(+e.target.value)} />
           <span className="text-xs text-secondary">0 = неограниченно</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Режим оценки</label>
+          <select className="select" value={gradingMode} onChange={e => setGradingMode(e.target.value)}>
+            <option value="overall">Общий (по всему тесту)</option>
+            <option value="per_topic">По темам (все темы должны быть зачтены)</option>
+          </select>
+          <span className="text-xs text-secondary">При режиме «По темам» тест считается пройденным, только если каждая тема зачтена</span>
         </div>
         <button className="btn btn-primary" disabled={saving} onClick={handleSave}>Сохранить настройки</button>
       </div>
@@ -733,7 +779,22 @@ function HistoryTab() {
             <p><strong>Тест:</strong> {detailResult.test_name}</p>
             <p><strong>Результат:</strong> {detailResult.final_status} ({detailResult.score_percentage?.toFixed(1)}%)</p>
             <p><strong>Длительность:</strong> {detailResult.duration}</p>
+            {detailResult.grading_mode && <p><strong>Режим оценки:</strong> {detailResult.grading_mode === 'per_topic' ? 'По темам' : 'Общий'}</p>}
           </div>
+          {detailResult.category_scores && Object.keys(detailResult.category_scores).length > 0 && (
+            <div className="mt-2">
+              <h4 style={{ marginBottom: '.5rem' }}>По темам</h4>
+              <div className="flex flex-col gap-xs">
+                {Object.entries(detailResult.category_scores).map(([cat, info]) => (
+                  <div key={cat} className="flex items-center gap-sm" style={{ flexWrap: 'wrap', fontSize: '.85rem' }}>
+                    <span style={{ fontWeight: 600, minWidth: 120 }}>{cat}</span>
+                    <span className="badge badge-neutral">{info.score}/{info.total} ({info.percentage}%)</span>
+                    <span className={`badge ${info.status && info.status !== 'незачтено' ? 'badge-green' : 'badge-red'}`}>{info.status || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {detailResult.answers && detailResult.answers.length > 0 && (
             <div className="mt-2">
               <h4 style={{ marginBottom: '.5rem' }}>Ответы</h4>
