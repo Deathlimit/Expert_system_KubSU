@@ -48,33 +48,21 @@ export default function LoginPage() {
 
     if (isRegister) {
       const res = await registerUser(username, password, group, fullName);
-      setLoading(false);
       if (res.ok) {
-        // Проверяем, есть ли токен приглашения
-        const pendingShare = localStorage.getItem('pending_share_token');
-        if (pendingShare) {
-          // Перенаправляем на страницу приглашения для входа
-          localStorage.removeItem('pending_share_token');
-          navigate(`/join/${pendingShare}`, { replace: true });
-        } else {
-          setSuccess(res.message + ' Теперь войдите.');
+        const loginRes = await loginUser(username, password);
+        setLoading(false);
+        if (!loginRes.ok) {
+          setError('Регистрация успешна, но не удалось войти автоматически. Попробуйте войти вручную.');
           setIsRegister(false);
         }
       } else {
+        setLoading(false);
         setError(res.message);
       }
     } else {
       const res = await loginUser(username, password);
       setLoading(false);
-      if (res.ok) {
-        const pendingShare = localStorage.getItem('pending_share_token');
-        if (pendingShare) {
-          localStorage.removeItem('pending_share_token');
-          navigate(`/join/${pendingShare}`, { replace: true });
-        } else {
-          navigate('/');
-        }
-      } else setError(res.message);
+      if (!res.ok) setError(res.message);
     }
   };
 
