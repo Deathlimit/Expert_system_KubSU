@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import * as api from '../api';
-import { FiPlay, FiClock, FiBookOpen, FiLogIn, FiUserPlus } from 'react-icons/fi';
+import { FiPlay, FiClock, FiBookOpen, FiLogIn, FiUserPlus, FiAlertCircle, FiArrowRight } from 'react-icons/fi';
 
 export default function JoinTest() {
   const { shareToken } = useParams();
@@ -38,9 +38,21 @@ export default function JoinTest() {
     setJoining(true);
     const res = await api.joinTestByShare(shareToken);
     if (res.ok) {
+      // Преподаватель/админ по ссылке — на свою страницу
       if (res.data.role_restricted) {
-        // Teacher/admin clicked share link — redirect to their dashboard
         navigate('/', { replace: true });
+        return;
+      }
+      // Учетная запись не активирована
+      if (res.data.account_not_activated) {
+        setError(res.data.message || 'Ваша учетная запись не активирована.');
+        setJoining(false);
+        return;
+      }
+      // Есть активный тест
+      if (res.data.has_active_session) {
+        setError(res.data.message || 'У вас уже есть активный тест.');
+        setJoining(false);
         return;
       }
       navigate(`/student/test/${res.data.test_id}`, { replace: true });
@@ -105,7 +117,21 @@ export default function JoinTest() {
           </div>
         )}
 
-        {error && <div className="toast toast-error" style={{ marginBottom: 16 }}>{error}</div>}
+        {error && (
+          <div style={{
+            marginBottom: 16,
+            padding: '1rem',
+            borderRadius: 10,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--color-red)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <FiAlertCircle size={18} style={{ color: 'var(--color-red)' }} />
+              <span style={{ color: 'var(--color-red)', fontWeight: 600 }}>Невозможно присоединиться</span>
+            </div>
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>{error}</div>
+          </div>
+        )}
 
         {user ? (
           <button

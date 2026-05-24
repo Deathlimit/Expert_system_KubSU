@@ -82,8 +82,16 @@ function TestTakingContent() {
         applyQuestion(q);
       }
     } else {
-      toast(res.data?.detail || 'Не удалось начать тест', 'error');
-      navigate('/student');
+      const errorMsg = res.data?.detail || 'Не удалось начать тест';
+      // Проверяем, есть ли активный тест
+      if (res.status === 409 && errorMsg.includes('активный тест')) {
+        toast(errorMsg, 'error');
+        // Перенаправляем на страницу студента, где будет показан активный тест
+        navigate('/student');
+      } else {
+        toast(errorMsg, 'error');
+        navigate('/student');
+      }
     }
     setLoading(false);
     startingRef.current = false;

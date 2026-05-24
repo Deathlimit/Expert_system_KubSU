@@ -49,8 +49,16 @@ export default function LoginPage() {
       const res = await registerUser(username, password, group, fullName);
       setLoading(false);
       if (res.ok) {
-        setSuccess(res.message + ' Теперь войдите.');
-        setIsRegister(false);
+        // Проверяем, есть ли токен приглашения
+        const pendingShare = localStorage.getItem('pending_share_token');
+        if (pendingShare) {
+          // Перенаправляем на страницу приглашения для входа
+          localStorage.removeItem('pending_share_token');
+          navigate(`/join/${pendingShare}`, { replace: true });
+        } else {
+          setSuccess(res.message + ' Теперь войдите.');
+          setIsRegister(false);
+        }
       } else {
         setError(res.message);
       }
