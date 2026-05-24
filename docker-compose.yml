@@ -1,21 +1,20 @@
 services:
-  # TEMPORARY: MongoDB disabled for testing
-  # mongodb:
-  #   image: mongo:7.0
-  #   restart: unless-stopped
-  #   ports:
-  #     - "27017:27017"
-  #   environment:
-  #     - MONGO_INITDB_ROOT_USERNAME=admin
-  #     - MONGO_INITDB_ROOT_PASSWORD=admin123
-  #     - MONGO_INITDB_DATABASE=testing_expert
-  #   volumes:
-  #     - mongo_data:/data/db
-  #   healthcheck:
-  #     test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+      - MONGO_INITDB_DATABASE=testing_expert
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   auth-service:
     build: ./auth_service
@@ -25,6 +24,9 @@ services:
     environment:
       - JWT_SECRET=testing-expert-system-jwt-secret-2026
       - MONGO_URI=mongodb://admin:admin123@mongodb:27017/testing_expert?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 15s
@@ -40,6 +42,9 @@ services:
     environment:
       - JWT_SECRET=testing-expert-system-jwt-secret-2026
       - MONGO_URI=mongodb://admin:admin123@mongodb:27017/testing_expert?authSource=admin
+    depends_on:
+      mongodb:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
       interval: 15s
@@ -57,6 +62,8 @@ services:
       - MONGO_URI=mongodb://admin:admin123@mongodb:27017/testing_expert?authSource=admin
       - CONTENT_SERVICE_URL=http://content-service:8002
     depends_on:
+      mongodb:
+        condition: service_healthy
       content-service:
         condition: service_healthy
     healthcheck:
@@ -77,6 +84,8 @@ services:
       - CONTENT_SERVICE_URL=http://content-service:8002
       - TEST_SERVICE_URL=http://test-service:8003
     depends_on:
+      mongodb:
+        condition: service_healthy
       content-service:
         condition: service_healthy
       test-service:

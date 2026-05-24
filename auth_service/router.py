@@ -278,3 +278,26 @@ async def delete_group(group_name: str, user=Depends(get_current_user)):
         raise HTTPException(404, "Группа не найдена.")
     logger.info("Group '%s' deleted by admin '%s'", group_name, user["sub"])
     return {"message": f"Группа '{group_name}' удалена."}
+
+
+@router.put("/auth/groups/{old_group_name}")
+async def rename_group(old_group_name: str, body: GroupBody, user=Depends(get_current_user)):
+    """Admin-only: rename a group."""
+    if user["role"] != ROLE_ADMIN:
+        raise HTTPException(403, "Только для администраторов.")
+    new_name = body.name.strip()
+    if not new_name:
+        raise HTTPException(400, "Имя группы не может быть пустым.")
+    if new_name == old_group_name:
+        return {"message": "Название группы не изменилось."}
+    # Check if new name already exists
+    if get_groups_col().find_one({"name": new_name}):
+        raise HTTPException(409, f"Группа '{new_name}' уже существует.")
+    # Update group
+    result = get_groups_col().update_one({"name": old_group_name}, {"$set": {"name": new_name}})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Группа не найдена.")
+    # Update users with this group
+    get_db().update_many({"group": old_group_name}, {"$set": {"group": new_name}})
+    logger.info("Group '%s' renamed to '%s' by admin '%s'", old_group_name, new_name, user["sub"])
+    return {"message": f"Группа '{old_group_name}' переименована в '{new_name}'."}

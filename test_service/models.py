@@ -9,6 +9,7 @@ class CreateTestBody(BaseModel):
     time_limit_minutes: Optional[int] = Field(default=None, ge=1)
     cooldown_hours: Optional[int] = Field(default=24, ge=0)
     max_attempts: Optional[int] = Field(default=None, ge=1)
+    grading_mode: Optional[str] = Field(default="overall")
 
 
 class AssignBody(BaseModel):
@@ -37,3 +38,4 @@ class UpdateTestSettingsBody(BaseModel):
     time_limit_minutes: Optional[int] = Field(default=None, ge=1)
     cooldown_hours: Optional[int] = Field(default=None, ge=0)
     max_attempts: Optional[int] = Field(default=None, ge=1)
+    grading_mode: Optional[str] = Field(default=None)

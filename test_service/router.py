@@ -107,6 +107,7 @@ async def create_test(body: CreateTestBody, user=Depends(get_current_user)):
         "time_limit_minutes": body.time_limit_minutes,
         "cooldown_hours": body.cooldown_hours if body.cooldown_hours is not None else 24,
         "max_attempts": body.max_attempts,
+        "grading_mode": body.grading_mode or "overall",
     })
     return {"test_id": test_id, "message": f"Тест '{body.test_name}' успешно создан."}
 
@@ -135,6 +136,8 @@ async def update_test_settings(test_id: str, body: UpdateTestSettingsBody, user=
         "cooldown_hours": body.cooldown_hours if body.cooldown_hours is not None else 0,
         "max_attempts": body.max_attempts,
     }
+    if body.grading_mode is not None:
+        updates["grading_mode"] = body.grading_mode
     get_col().update_one({"test_id": test_id}, {"$set": updates})
     logger.info("Test '%s' settings updated by %s", test_id, user["sub"])
     return {"message": "Настройки теста обновлены."}
@@ -158,6 +161,7 @@ async def clone_test(test_id: str, user=Depends(get_current_user)):
         "time_limit_minutes": t.get("time_limit_minutes"),
         "cooldown_hours": t.get("cooldown_hours", 24),
         "max_attempts": t.get("max_attempts"),
+        "grading_mode": t.get("grading_mode", "overall"),
     }
     get_col().insert_one(clone)
     logger.info("Test '%s' cloned as '%s' by %s", test_id, new_id, user["sub"])

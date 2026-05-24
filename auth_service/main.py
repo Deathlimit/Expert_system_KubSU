@@ -1,5 +1,6 @@
 ﻿import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,6 +15,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "").split(",") if os.environ.get("CORS_ORIGINS") else ["*"]
 
 # TEMPORARY: Self-ping to prevent Render free tier from sleeping
 # TODO: Remove this when proper solution is implemented (e.g., Render Pro, cron job, etc.)
@@ -54,7 +57,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Auth Service", version="1.0.0", root_path="/", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=False,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=bool(CORS_ORIGINS != ["*"]),
     allow_methods=["*"], allow_headers=["*"],
 )
 app.include_router(router)

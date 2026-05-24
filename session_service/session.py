@@ -33,6 +33,8 @@ class TestSession:
         premade_test_id: Optional[str] = None,
         test_name: Optional[str] = None,
         time_limit_minutes: Optional[int] = None,
+        grading_mode: str = "overall",
+        user_role: str = "student",
     ):
         self.session_id = uuid.uuid4().hex
         self.username = username
@@ -41,6 +43,8 @@ class TestSession:
         self.premade_test_id = premade_test_id
         self.test_name = test_name
         self.time_limit_minutes = time_limit_minutes
+        self.grading_mode = grading_mode
+        self.user_role = user_role
         self.user_answers: list = []
         self.current_question_index = 0
         self.results: dict = {}
@@ -191,35 +195,26 @@ class TestSession:
                 return rule.get("description", "Статус не определен"), rule.get("is_pass_status", False)
         return "Статус не определен", False
 
-    def _build_topics_status(self, sorted_criteria: list) -> tuple:
-        """Evaluate all categories. Returns (topics_status dict, all_passed bool)."""
+    def _build_topics_status_raw(self) -> dict:
+        """Calculate raw per-category scores and percentages (no criteria applied)."""
         topics_status = {}
-        all_passed = True
-
         for cat, max_pts in self.category_max_points.items():
             score = self.results.get(cat, 0)
             if isinstance(score, str):
-                continue
+                score = 0
             if max_pts > 0:
                 pct = (score / max_pts) * 100
-                status_desc, is_pass = self._apply_criteria(pct, sorted_criteria)
                 topics_status[cat] = {
                     "score": score,
                     "total": max_pts,
                     "percentage": round(pct, 2),
-                    "status": status_desc,
+                    "status": "",
                 }
-                if not is_pass:
-                    all_passed = False
             else:
                 topics_status[cat] = {"score": 0, "total": 0, "percentage": 0, "status": "Нет вопросов"}
+        return topics_status
 
-        if not any(v > 0 for v in self.category_max_points.values()):
-            all_passed = False
-
-        return topics_status, all_passed
-
-    def _build_answers_list(self) -> list:
+    def _build_answers_list(self, hide_correct: bool = False) -> list:
         """Build a per-question answer review for the result report."""
         answers = []
         for i, q in enumerate(self.questions):
@@ -231,12 +226,14 @@ class TestSession:
                     user_repr = str(user_ans)
             else:
                 user_repr = "Нет ответа"
-            answers.append({
+            answer_entry = {
                 "question": q["question"],
                 "user_answer": user_repr,
-                "correct_answer": q["correct"],
                 "category": self._get_category(i),
-            })
+            }
+            if not hide_correct:
+                answer_entry["correct_answer"] = q["correct"]
+            answers.append(answer_entry)
         return answers
 
     def _save_result(self, result_detail: dict) -> None:
@@ -259,6 +256,8 @@ class TestSession:
             "premade_test_id": self.premade_test_id,
             "test_name": self.test_name,
             "time_limit_minutes": self.time_limit_minutes,
+            "grading_mode": self.grading_mode,
+            "user_role": self.user_role,
             "user_answers": self.user_answers,
             "current_question_index": self.current_question_index,
             "correct_answers": self.correct_answers,
@@ -278,6 +277,8 @@ class TestSession:
         obj.premade_test_id = data.get("premade_test_id")
         obj.test_name = data.get("test_name")
         obj.time_limit_minutes = data.get("time_limit_minutes")
+        obj.grading_mode = data.get("grading_mode", "overall")
+        obj.user_role = data.get("user_role", "student")
         obj.user_answers = data.get("user_answers", [])
         obj.current_question_index = data.get("current_question_index", 0)
         obj.correct_answers = data.get("correct_answers", 0)
@@ -305,10 +306,13 @@ class TestSession:
             })
         return result
 
-    def _evaluate_and_finish(self) -> dict:
+    def _evaluate_and_finish(self, hide_correct: bool = False) -> dict:
         """
         Inference engine entry point.
-        Applies grading rules per category, determines final verdict, persists result.
+        Supports two grading modes:
+          - "overall":  apply criteria to the whole-test percentage → single verdict
+          - "per_topic": apply criteria per topic → test passes only if ALL topics pass
+        hide_correct: if True, correct answers are hidden from the result (for students)
         """
         self.end_time = datetime.now()
         duration = self.end_time - self.start_time
@@ -316,17 +320,51 @@ class TestSession:
         self.results["correct_count"] = f"{self.correct_answers}/{len(self.questions)}"
 
         sorted_criteria = self._get_sorted_criteria()
-        topics_status, all_passed = self._build_topics_status(sorted_criteria)
+        topics_status = self._build_topics_status_raw()
         self.results["topic_result"] = topics_status
 
-        if all_passed:
-            self.results["status_message"] = "Тест успешно пройден."
-            self.results["final_status"] = "Зачёт"
-        else:
-            self.results["status_message"] = "Тест не пройден."
-            self.results["final_status"] = "Не зачёт"
+        if self.grading_mode == "per_topic":
+            # Per-topic: each topic evaluated separately, all must pass
+            all_passed = True
+            for cat, info in topics_status.items():
+                if info["total"] > 0:
+                    status_desc, is_pass = self._apply_criteria(info["percentage"], sorted_criteria)
+                    info["status"] = status_desc
+                    if not is_pass:
+                        all_passed = False
+                else:
+                    info["status"] = "Нет вопросов"
+            if not any(v > 0 for v in self.category_max_points.values()):
+                all_passed = False
 
+            if all_passed:
+                self.results["status_message"] = "Тест успешно пройден (все темы зачтены)."
+                self.results["final_status"] = "Зачёт"
+            else:
+                self.results["status_message"] = "Тест не пройден (не все темы зачтены)."
+                self.results["final_status"] = "Не зачёт"
+        else:
+            # Overall: single percentage for the whole test
+            score_pct = round((self.correct_answers / len(self.questions)) * 100, 1) if self.questions else 0
+            status_desc, is_pass = self._apply_criteria(score_pct, sorted_criteria)
+
+            # Fill per-topic statuses for display
+            for cat, info in topics_status.items():
+                info["status"] = status_desc if info["total"] > 0 else "Нет вопросов"
+
+            if is_pass:
+                self.results["status_message"] = "Тест успешно пройден."
+                self.results["final_status"] = "Зачёт"
+            else:
+                self.results["status_message"] = "Тест не пройден."
+                self.results["final_status"] = "Не зачёт"
+
+        # Always compute score_pct for result_detail
         score_pct = round((self.correct_answers / len(self.questions)) * 100, 1) if self.questions else 0
+
+        # Hide correct answers for students
+        hide_correct = self.user_role == "student"
+
         result_detail = {
             "username": self.username,
             "test_name": self.test_name,
@@ -337,8 +375,9 @@ class TestSession:
             "category_scores": topics_status,
             "status": self.results["status_message"],
             "final_status": self.results["final_status"],
-            "answers": self._build_answers_list(),
+            "answers": self._build_answers_list(hide_correct=hide_correct),
             "premade_test_id": self.premade_test_id,
+            "grading_mode": self.grading_mode,
         }
 
         self._save_result(result_detail)

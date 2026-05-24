@@ -210,6 +210,8 @@ async def start_session(
                 premade_test_id=body.test_id,
                 test_name=test_data.get("test_name"),
                 time_limit_minutes=test_data.get("time_limit_minutes"),
+                grading_mode=test_data.get("grading_mode", "overall"),
+                user_role=user["role"],
             )
 
         elif body.num_questions_per_category:
@@ -228,11 +230,16 @@ async def start_session(
             selected = []
             for cat, num_needed in body.num_questions_per_category.items():
                 available = all_questions.get(cat, [])
-                sampled = random.sample(available, min(num_needed, len(available)))
-                for q_orig in sampled:
-                    q = dict(q_orig)
-                    q["category"] = cat
-                    selected.append(q)
+                if not available:
+                    logger.warning(f"No questions available for category: {cat}")
+                    continue
+                num_to_sample = min(num_needed, len(available))
+                if num_to_sample > 0:
+                    sampled = random.sample(available, num_to_sample)
+                    for q_orig in sampled:
+                        q = dict(q_orig)
+                        q["category"] = cat
+                        selected.append(q)
 
             if not selected:
                 raise HTTPException(400, "Не удалось сгенерировать вопросы для теста.")
@@ -242,7 +249,7 @@ async def start_session(
                 headers=auth_header(authorization),
             )
             criteria = resp2.json() if resp2.status_code == 200 else {"topic_criteria": []}
-            session = TestSession(username, selected, criteria)
+            session = TestSession(username, selected, criteria, user_role=user["role"])
 
         else:
             raise HTTPException(400, "Укажите test_id или num_questions_per_category.")
@@ -309,17 +316,39 @@ async def get_results_for_test(test_id: str, user=Depends(get_current_user)):
 
 @router.get("/sessions/results/test/{test_id}/stats")
 async def get_test_aggregate_stats(test_id: str, user=Depends(get_current_user)):
-    """Return aggregate statistics for a specific premade test."""
+    """Return aggregate statistics for a specific premade test, including per-topic breakdown."""
     if user["role"] not in ("teacher", "admin"):
         raise HTTPException(403, "Недостаточно прав.")
     col = get_col()
     records = list(col.find({"premade_test_id": test_id}, {"_id": 0}))
     if not records:
-        return {"total_attempts": 0, "unique_students": 0, "average_score": 0, "pass_rate": 0, "best_score": 0, "worst_score": 0}
+        return {
+            "total_attempts": 0, "unique_students": 0, "average_score": 0,
+            "pass_rate": 0, "best_score": 0, "worst_score": 0,
+            "per_topic": {},
+        }
 
     scores = [r.get("score_percentage", 0) for r in records if r.get("score_percentage") is not None]
     passed = sum(1 for r in records if r.get("final_status") in ("Зачёт", "Passed"))
     unique_students = len(set(r.get("username") for r in records if r.get("username")))
+
+    # Per-topic aggregate: collect all topic scores across all attempts
+    topic_scores: dict = {}  # topic → list of percentages
+    for r in records:
+        cat_scores = r.get("category_scores", {})
+        for cat, info in cat_scores.items():
+            if isinstance(info, dict) and info.get("total", 0) > 0:
+                topic_scores.setdefault(cat, []).append(info.get("percentage", 0))
+
+    per_topic = {}
+    for cat, pcts in topic_scores.items():
+        if pcts:
+            per_topic[cat] = {
+                "average": round(sum(pcts) / len(pcts), 1),
+                "best": round(max(pcts), 1),
+                "worst": round(min(pcts), 1),
+                "attempts": len(pcts),
+            }
 
     return {
         "total_attempts": len(records),
@@ -328,6 +357,7 @@ async def get_test_aggregate_stats(test_id: str, user=Depends(get_current_user))
         "pass_rate": round((passed / len(records)) * 100, 1) if records else 0,
         "best_score": round(max(scores), 1) if scores else 0,
         "worst_score": round(min(scores), 1) if scores else 0,
+        "per_topic": per_topic,
     }
 
 
