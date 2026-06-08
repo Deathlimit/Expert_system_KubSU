@@ -1,5 +1,4 @@
-﻿import asyncio
-import logging
+﻿import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -17,32 +16,11 @@ logger = logging.getLogger(__name__)
 
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "").split(",") if os.environ.get("CORS_ORIGINS") else ["*"]
 
-# Интервал самопинга (3 минуты)
-PING_INTERVAL_SECONDS = 180
-
-
-async def _self_ping_loop(base_url: str):
-    # Самопинг для поддержания активности сервиса
-    await asyncio.sleep(PING_INTERVAL_SECONDS)
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.get(f"{base_url}/health")
-            logger.info("Self-ping completed to prevent sleep")
-    except Exception as e:
-        logger.warning(f"Self-ping failed: {e}")
-    finally:
-        asyncio.create_task(_self_ping_loop(base_url))
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Test Service starting up...")
     get_col()
-
-    base_url = "https://expert-system-431h.onrender.com"
-    asyncio.create_task(_self_ping_loop(base_url))
-    logger.info("Self-ping loop started")
 
     logger.info("Test Service ready.")
     yield

@@ -16,7 +16,6 @@ router = APIRouter()
 
 
 def _strip_correct(t: dict) -> dict:
-    # Удаление правильных ответов (для студентов)
     if "questions" in t:
         t = dict(t)
         t["questions"] = [{k: v for k, v in q.items() if k != "correct"} for q in t["questions"]]
@@ -24,7 +23,6 @@ def _strip_correct(t: dict) -> dict:
 
 
 def _enrich_creator(tests: list) -> list:
-    # Добавление ФИО создателя к тестам
     usernames = list({t.get("creator_username") for t in tests if t.get("creator_username")})
     if not usernames:
         return tests
@@ -109,6 +107,7 @@ async def create_test(body: CreateTestBody, user=Depends(get_current_user)):
         "cooldown_hours": body.cooldown_hours if body.cooldown_hours is not None else 24,
         "max_attempts": body.max_attempts,
         "grading_mode": body.grading_mode or "overall",
+        "show_results_to_students": body.show_results_to_students if body.show_results_to_students is not None else True,
     })
     return {"test_id": test_id, "message": f"Тест '{body.test_name}' успешно создан."}
 
@@ -141,6 +140,8 @@ async def update_test_settings(test_id: str, body: UpdateTestSettingsBody, user=
     }
     if body.grading_mode is not None:
         updates["grading_mode"] = body.grading_mode
+    if body.show_results_to_students is not None:
+        updates["show_results_to_students"] = body.show_results_to_students
     get_col().update_one({"test_id": test_id}, {"$set": updates})
     logger.info("Test '%s' settings updated by %s", test_id, user["sub"])
     return {"message": "Настройки теста обновлены."}
@@ -166,6 +167,7 @@ async def clone_test(test_id: str, user=Depends(get_current_user)):
         "cooldown_hours": t.get("cooldown_hours", 24),
         "max_attempts": t.get("max_attempts"),
         "grading_mode": t.get("grading_mode", "overall"),
+        "show_results_to_students": t.get("show_results_to_students", True),
     }
     get_col().insert_one(clone)
     logger.info("Test '%s' cloned as '%s' by %s", test_id, new_id, user["sub"])
@@ -192,7 +194,7 @@ async def delete_test(
                 headers=get_auth_header(authorization),
             )
     except Exception:
-        pass  # Do not fail the delete if criteria cleanup fails
+        pass
     return {"message": f"Тест '{t.get('test_name', '')}' удалён."}
 
 
@@ -279,10 +281,6 @@ async def batch_update_assignments(test_id: str, body: BatchAssignBody, user=Dep
     return {"messages": messages, "test": get_col().find_one({"test_id": test_id}, {"_id": 0})}
 
 
-# ------------------------------------------------------------------
-# Эндпоинты для ссылок приглашения
-# ------------------------------------------------------------------
-
 # Создание ссылки приглашения
 @router.post("/tests/{test_id}/share")
 async def share_test(test_id: str, user=Depends(get_current_user)):
@@ -337,17 +335,15 @@ async def join_test_by_share(share_token: str, authorization: str = Header(...),
     username = user["sub"]
     role = user.get("role", "student")
 
-    # Преподаватели не могут проходить тесты по ссылке
     if role not in ("student", "admin"):
         return {
             "test_id": test_id,
             "test_name": t.get("test_name", ""),
             "already_assigned": False,
             "role_restricted": True,
-            "message": "Преподаватели не могут проходить тесты по ссылке приглашения.",
+            "message": "Преподаватели не могут проходить тесты по ссылке приглашения",
         }
 
-    # Проверка: учетная запись не активирована
     if role == "unassigned":
         return {
             "test_id": test_id,
@@ -357,7 +353,6 @@ async def join_test_by_share(share_token: str, authorization: str = Header(...),
             "message": "Ваша учетная запись не активирована. Обратитесь к преподавателю.",
         }
 
-    # Проверка: есть ли активная сессия для другого теста
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp_active = await client.get(
@@ -377,7 +372,7 @@ async def join_test_by_share(share_token: str, authorization: str = Header(...),
                         "message": "У вас уже есть активный тест. Завершите его прежде чем присоединяться к новому.",
                     }
     except httpx.RequestError:
-        pass  # Если сервис недоступен, продолжаем
+        pass
 
     was_assigned = username in assigned
     if not was_assigned:
@@ -399,7 +394,6 @@ async def generate_test(
     authorization: str = Header(...),
     user=Depends(get_current_user),
 ):
-    # Генерация теста по теме и максимальному баллу
     if user["role"] not in ("teacher", "admin"):
         raise HTTPException(403, "Недостаточно прав.")
 

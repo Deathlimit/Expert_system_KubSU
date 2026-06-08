@@ -34,7 +34,7 @@ def get_active_sessions_col():
     # Возвращает коллекцию активных сессий
     global _client
     if _client is None:
-        get_col()  # ensure connection
+        get_col()
     col = _client["testing_expert"]["active_sessions"]
     col.create_index("session_id", unique=True)
     col.create_index("username")

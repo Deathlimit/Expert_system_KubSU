@@ -10,11 +10,10 @@ JWT_ALGORITHM = "HS256"
 _users_col = None
 
 def _get_users_col():
-    # Получение коллекции пользователей
     global _users_col
     if _users_col is None:
         from database import get_col
-        get_col()  # ensure connection
+        get_col()
         from database import _client
         _users_col = _client["testing_expert"]["users"]
     return _users_col
@@ -50,7 +49,6 @@ def auth_header(authorization: str) -> dict:
 
 
 def service_auth_header() -> dict:
-    # Генерация токена для сервисных вызовов
     payload = {
         "sub": "__service__session",
         "role": "teacher",

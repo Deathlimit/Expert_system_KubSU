@@ -9,7 +9,6 @@ JWT_ALGORITHM = "HS256"
 _users_col = None
 
 def _get_users_col():
-    # Получение коллекции пользователей
     global _users_col
     if _users_col is None:
         from database import get_db

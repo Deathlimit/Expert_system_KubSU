@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://admin:admin123@localhost:27017/testing_expert?authSource=admin")
 CONTENT_SERVICE_URL = os.environ.get("CONTENT_SERVICE_URL", "http://localhost:8002")
-SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:8003")
+SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:8004")
 
 _client: Optional[MongoClient] = None
 

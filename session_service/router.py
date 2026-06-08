@@ -15,19 +15,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Кэш активных сессий в памяти
 _sessions: dict = {}
-
-# Время до автоматического удаления устаревшей сессии (часы)
 _SESSION_STALE_HOURS = 6
 
 
-# ------------------------------------------------------------------
-# Функции для работы с БД
-# ------------------------------------------------------------------
-
 def _save_session_to_db(session: TestSession):
-    # Сохранение сессии в MongoDB
     try:
         doc = session.to_dict()
         get_active_sessions_col().replace_one({"session_id": session.session_id}, doc, upsert=True)
@@ -36,7 +28,6 @@ def _save_session_to_db(session: TestSession):
 
 
 def _load_session_from_db(session_id: str, username: str):
-    # Загрузка сессии из MongoDB
     doc = get_active_sessions_col().find_one({"session_id": session_id, "username": username})
     if not doc:
         return None
@@ -44,7 +35,6 @@ def _load_session_from_db(session_id: str, username: str):
 
 
 def _delete_session_from_db(session_id: str):
-    # Удаление сессии из MongoDB
     try:
         result = get_active_sessions_col().delete_one({"session_id": session_id})
         logger.info("Deleted session %s from DB (matched=%d)", session_id, result.deleted_count)
@@ -53,12 +43,10 @@ def _delete_session_from_db(session_id: str):
 
 
 def _delete_all_sessions_for_user(username: str):
-    # Удаление всех сессий пользователя
     try:
         result = get_active_sessions_col().delete_many({"username": username})
         if result.deleted_count > 0:
             logger.info("Cleaned up %d orphaned session(s) for user %s", result.deleted_count, username)
-        # Also clean memory cache
         to_remove = [sid for sid, s in _sessions.items() if s.username == username]
         for sid in to_remove:
             _sessions.pop(sid, None)
@@ -67,7 +55,6 @@ def _delete_all_sessions_for_user(username: str):
 
 
 def _find_active_session_for_user(username: str):
-    # Поиск активной сессии пользователя
     doc = get_active_sessions_col().find_one({"username": username})
     if not doc:
         return None
@@ -75,7 +62,6 @@ def _find_active_session_for_user(username: str):
 
 
 def _auto_finish_expired(session: TestSession) -> dict:
-    # Автозавершение просроченной сессии
     while session.current_question_index < len(session.questions):
         session.user_answers.append(None)
         session.current_question_index += 1
@@ -85,10 +71,6 @@ def _auto_finish_expired(session: TestSession) -> dict:
     return results
 
 
-# ------------------------------------------------------------------
-# Эндпоинт активной сессии
-# ------------------------------------------------------------------
-
 # Получение активной сессии пользователя
 @router.get("/sessions/active")
 async def get_active_session(user=Depends(get_current_user)):
@@ -97,6 +79,10 @@ async def get_active_session(user=Depends(get_current_user)):
         return {"active": False}
     if session.is_time_expired():
         results = _auto_finish_expired(session)
+        if not session.show_results_to_students:
+            results.pop("score_percentage", None)
+            results.pop("category_scores", None)
+            results.pop("correct_count", None)
         return {"active": False, "finished_expired": True, "results": results}
     if session.current_question_index >= len(session.questions):
         logger.warning("Found orphaned completed session %s for user %s, cleaning up", session.session_id, user["sub"])
@@ -116,10 +102,6 @@ async def get_active_session(user=Depends(get_current_user)):
     }
 
 
-# ------------------------------------------------------------------
-# Жизненный цикл сессии
-# ------------------------------------------------------------------
-
 # Начало новой сессии тестирования
 @router.post("/sessions/start")
 async def start_session(
@@ -137,7 +119,7 @@ async def start_session(
                     logger.warning("Cleaning up orphaned completed session %s", existing.session_id)
                     _delete_session_from_db(existing.session_id)
                     _sessions.pop(existing.session_id, None)
-                    existing = None  # allow creating new session
+                    existing = None
 
             if existing:
                 if existing.premade_test_id == body.test_id:
@@ -156,7 +138,6 @@ async def start_session(
                 else:
                     raise HTTPException(409, "У вас уже есть активный тест. Завершите его прежде чем начинать новый.")
 
-            # Получение данных теста
             try:
                 resp_test = await client.get(
                     f"{TEST_SERVICE_URL}/tests/{body.test_id}",
@@ -205,10 +186,10 @@ async def start_session(
                 time_limit_minutes=test_data.get("time_limit_minutes"),
                 grading_mode=test_data.get("grading_mode", "overall"),
                 user_role=user["role"],
+                show_results_to_students=test_data.get("show_results_to_students", True),
             )
 
         elif body.num_questions_per_category:
-            # Генерация случайных вопросов по категориям
             try:
                 resp = await client.get(
                     f"{CONTENT_SERVICE_URL}/content/questions",
@@ -272,6 +253,10 @@ async def submit_answer(session_id: str, body: SubmitAnswerBody, user=Depends(ge
             results_inner = result.get("results") or result
             for a in results_inner.get("answers", []):
                 a.pop("correct_answer", None)
+            if not session.show_results_to_students:
+                results_inner.pop("score_percentage", None)
+                results_inner.pop("category_scores", None)
+                results_inner.pop("correct_count", None)
     else:
         _sessions[session_id] = session
         _save_session_to_db(session)
@@ -289,10 +274,6 @@ async def session_status(session_id: str, user=Depends(get_current_user)):
         "finished": session.current_question_index >= len(session.questions),
     }
 
-
-# ------------------------------------------------------------------
-# Статистика по тестам
-# ------------------------------------------------------------------
 
 # Получение результатов теста
 @router.get("/sessions/results/test/{test_id}")
@@ -353,10 +334,6 @@ async def get_test_aggregate_stats(test_id: str, user=Depends(get_current_user))
     }
 
 
-# ------------------------------------------------------------------
-# История
-# ------------------------------------------------------------------
-
 # Получение всей истории (преподаватель/админ)
 @router.get("/sessions/history")
 async def get_all_history(user=Depends(get_current_user)):
@@ -373,7 +350,6 @@ async def clear_history(
     test_id: str = None,
     user=Depends(get_current_user),
 ):
-    # Очистка истории по username или test_id
     if user["role"] not in ("teacher", "admin"):
         raise HTTPException(403, "Недостаточно прав.")
 
@@ -403,12 +379,11 @@ async def get_user_history(username: str, user=Depends(get_current_user)):
         for r in processed:
             for a in r.get("answers", []):
                 a.pop("correct_answer", None)
+            if not r.get("show_results_to_students", True):
+                r.pop("score_percentage", None)
+                r.pop("category_scores", None)
     return processed
 
-
-# ------------------------------------------------------------------
-# Проверка допуска (24-часовой перерыв)
-# ------------------------------------------------------------------
 
 # Проверка допуска к тесту
 @router.get("/sessions/eligibility/{username}/{test_id}")
@@ -433,12 +408,7 @@ async def check_eligibility(
     return {"eligible": is_eligible, "message": message}
 
 
-# ------------------------------------------------------------------
-# Вспомогательные функции
-# ------------------------------------------------------------------
-
 def _get_session(session_id: str, username: str) -> TestSession:
-    # Получение сессии по ID
     session = _sessions.get(session_id)
     if session:
         if session.username != username:
@@ -447,12 +417,11 @@ def _get_session(session_id: str, username: str) -> TestSession:
     db_session = _load_session_from_db(session_id, username)
     if not db_session:
         raise HTTPException(404, "Сессия не найдена.")
-    _sessions[session_id] = db_session  # cache in memory
+    _sessions[session_id] = db_session
     return db_session
 
 
 def _cleanup_stale_sessions() -> None:
-    # Очистка устаревших сессий
     now = datetime.now()
     stale_ids = [
         sid for sid, s in _sessions.items()
@@ -469,7 +438,6 @@ def _cleanup_stale_sessions() -> None:
 
 
 def _process_history(user_history: list) -> list:
-    # Обработка истории пользователя
     premade = sorted(
         [r for r in user_history if r.get("premade_test_id")],
         key=lambda x: (x["premade_test_id"], x.get("start_time", "")),
@@ -494,7 +462,6 @@ def _process_history(user_history: list) -> list:
 
 
 def _check_eligibility_internal(username: str, test_id: str, test_data: dict = None) -> tuple:
-    # Проверка допуска (кулдаун и лимит попыток)
     col = get_col()
 
     cooldown_hours = 24

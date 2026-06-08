@@ -30,7 +30,6 @@ async def setup_first_admin(req: LoginRequest):
             "token_version": 0,
         })
     except DuplicateKeyError:
-        # User exists but is not admin — promote them
         col.update_one({"username": req.username}, {"$set": {"role": ROLE_ADMIN, "password": hash_password(req.password)}})
     logger.info("First admin '%s' created via /auth/setup", req.username)
     return {"message": f"Администратор '{req.username}' создан. Войдите в систему."}
@@ -101,7 +100,7 @@ async def register(req: RegisterRequest):
             {"$addToSet": {"assigned_students": req.username}},
         )
     except Exception:
-        pass  # Don't fail registration if demo test assignment fails
+        pass
     return {"message": "Вы успешно зарегистрировались! Можете войти в систему."}
 
 

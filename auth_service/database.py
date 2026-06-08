@@ -35,7 +35,7 @@ def get_db():
 
 def get_groups_col():
     # Возвращает коллекцию групп
-    get_db()  # ensure connection is established
+    get_db()
     col = _client["testing_expert"]["groups"]
     col.create_index("name", unique=True)
     return col
@@ -43,7 +43,7 @@ def get_groups_col():
 
 def get_tests_col():
     # Возвращает коллекцию готовых тестов
-    get_db()  # ensure connection
+    get_db()
     return _client["testing_expert"]["premade_tests"]
 
 
