@@ -16,6 +16,7 @@ export default function CreateTest() {
   const [cooldown, setCooldown] = useState(24);
   const [maxAttempts, setMaxAttempts] = useState(0);
   const [gradingMode, setGradingMode] = useState('overall');
+  const [showResults, setShowResults] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pendingCriteria, setPendingCriteria] = useState(null);
   const [showCriteria, setShowCriteria] = useState(false);
@@ -61,7 +62,8 @@ export default function CreateTest() {
       timeLimit || null,
       cooldown,
       maxAttempts || null,
-      gradingMode
+      gradingMode,
+      showResults
     );
     setSaving(false);
 
@@ -109,6 +111,12 @@ export default function CreateTest() {
               <option value="overall">Общий (по всему тесту)</option>
               <option value="per_topic">По темам (все темы должны быть зачтены)</option>
             </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+              <input type="checkbox" checked={showResults} onChange={e => setShowResults(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+              Показывать студентам баллы после теста
+            </label>
           </div>
           <div className="text-sm text-secondary mb-2">Выбрано вопросов: <strong>{selectedIds.size}</strong></div>
           <button className="btn btn-secondary mb-2" style={{ width: '100%' }} onClick={() => setShowCriteria(true)}>

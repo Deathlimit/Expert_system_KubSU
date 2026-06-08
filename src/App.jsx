@@ -8,7 +8,6 @@ import StudentDashboard from './pages/student/StudentDashboard';
 import TestTaking from './pages/student/TestTaking';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import ServerWakeUp from './components/ServerWakeUp';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user } = useAuth();
@@ -47,7 +46,6 @@ export default function App() {
         <Router>
           <AppRoutes />
         </Router>
-        <ServerWakeUp />
       </AuthProvider>
     </ThemeProvider>
   );

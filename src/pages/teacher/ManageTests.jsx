@@ -667,6 +667,7 @@ function TestSettingsModal({ test, onClose, onSaved }) {
   const [cooldown, setCooldown] = useState(test.cooldown_hours != null ? test.cooldown_hours : 24);
   const [maxAttempts, setMaxAttempts] = useState(test.max_attempts || 0);
   const [gradingMode, setGradingMode] = useState(test.grading_mode || 'overall');
+  const [showResults, setShowResults] = useState(test.show_results_to_students != null ? test.show_results_to_students : true);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -676,6 +677,7 @@ function TestSettingsModal({ test, onClose, onSaved }) {
       cooldown_hours: cooldown,
       max_attempts: maxAttempts > 0 ? maxAttempts : null,
       grading_mode: gradingMode,
+      show_results_to_students: showResults,
     });
     setSaving(false);
     if (res.ok) { toast('Настройки сохранены', 'success'); onSaved(); onClose(); }
@@ -707,6 +709,12 @@ function TestSettingsModal({ test, onClose, onSaved }) {
             <option value="per_topic">По темам (все темы должны быть зачтены)</option>
           </select>
           <span className="text-xs text-secondary">При режиме «По темам» тест считается пройденным, только если каждая тема зачтена</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+            <input type="checkbox" checked={showResults} onChange={e => setShowResults(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+            Показывать студентам баллы после теста
+          </label>
         </div>
         <button className="btn btn-primary" disabled={saving} onClick={handleSave}>Сохранить настройки</button>
       </div>

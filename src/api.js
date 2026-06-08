@@ -1,5 +1,5 @@
-const API_BASE = import.meta.env.PROD
-  ? 'https://expert-system-431h.onrender.com'
+const API_BASE = import.meta.env.VITE_API_BASE !== undefined
+  ? import.meta.env.VITE_API_BASE
   : '';
 
 const AUTH = `${API_BASE}/auth`;
@@ -12,44 +12,6 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-const WAKE_URL = 'https://expert-system-431h.onrender.com/';
-const WAKE_POLL_INTERVAL = 3000;
-const WAKE_DELAY = 5000;
-
-let _wakeUpVisible = false;
-
-function _showWakeUp() {
-  if (!_wakeUpVisible) {
-    _wakeUpVisible = true;
-    window.dispatchEvent(new Event('server-waking-up'));
-  }
-}
-
-function _hideWakeUp() {
-  if (_wakeUpVisible) {
-    _wakeUpVisible = false;
-    window.dispatchEvent(new Event('server-ready'));
-  }
-}
-
-function _needsWakeUp(res) {
-  return !res || res.status === 520 || res.status === 502 || res.status === 503;
-}
-
-async function _waitForServer() {
-  _showWakeUp();
-  while (true) {
-    try {
-      const ping = await fetch(WAKE_URL, { method: 'GET' });
-      if (ping.ok) {
-        _hideWakeUp();
-        return;
-      }
-    } catch { /* server still sleeping */ }
-    await new Promise((r) => setTimeout(r, WAKE_POLL_INTERVAL));
-  }
-}
-
 async function request(method, url, body = null) {
   const opts = {
     method,
@@ -57,29 +19,12 @@ async function request(method, url, body = null) {
   };
   if (body !== null) opts.body = JSON.stringify(body);
 
-  const wakeTimer = setTimeout(_showWakeUp, WAKE_DELAY);
-
   let res;
   try {
     res = await fetch(url, opts);
   } catch {
-    res = null;
+    return { ok: false, status: 0, data: { detail: 'Нет соединения с сервером' } };
   }
-
-  if (_needsWakeUp(res)) {
-    clearTimeout(wakeTimer);
-    await _waitForServer();
-    // retry the original request after server woke up
-    try {
-      res = await fetch(url, opts);
-    } catch {
-      _hideWakeUp();
-      return { ok: false, status: 0, data: { detail: 'Нет соединения с сервером' } };
-    }
-  }
-
-  clearTimeout(wakeTimer);
-  _hideWakeUp();
 
   if (res.status === 401) {
     localStorage.removeItem('token');
@@ -198,8 +143,8 @@ export async function getTestById(testId) {
 export async function getAssignedTests(studentUsername) {
   return request('GET', `${TESTS}/assigned/${encodeURIComponent(studentUsername)}`);
 }
-export async function createTest(testName, questions, timeLimitMinutes, cooldownHours, maxAttempts, gradingMode = 'overall') {
-  const body = { test_name: testName, questions, grading_mode: gradingMode };
+export async function createTest(testName, questions, timeLimitMinutes, cooldownHours, maxAttempts, gradingMode = 'overall', showResults = true) {
+  const body = { test_name: testName, questions, grading_mode: gradingMode, show_results_to_students: showResults };
   if (timeLimitMinutes) body.time_limit_minutes = timeLimitMinutes;
   if (cooldownHours != null) body.cooldown_hours = cooldownHours;
   if (maxAttempts) body.max_attempts = maxAttempts;

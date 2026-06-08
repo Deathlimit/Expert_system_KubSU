@@ -255,10 +255,22 @@ function TestTakingContent() {
               {results.status_message || results.status}
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '2.5rem', flexWrap: 'wrap' }}>
-              <div>
-                <div className="text-secondary" style={{ fontSize: '.8rem', marginBottom: 4 }}>Балл</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 700 }}>{results.score_percentage?.toFixed(1)}%</div>
-              </div>
+              {results.score_percentage != null && (
+                <div>
+                  <div className="text-secondary" style={{ fontSize: '.8rem', marginBottom: 4 }}>Балл</div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 700 }}>{results.score_percentage?.toFixed(1)}%</div>
+                </div>
+              )}
+              {results.category_scores && Object.keys(results.category_scores).length > 0 && (
+                <div style={{ width: '100%', marginTop: '1rem' }}>
+                  {Object.entries(results.category_scores).map(([cat, info]) => (
+                    <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span>{cat}</span>
+                      <span style={{ fontWeight: 600 }}>{info.score}/{info.total} ({info.percentage?.toFixed(0)}%) — {info.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div>
                 <div className="text-secondary" style={{ fontSize: '.8rem', marginBottom: 4 }}>Длительность</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 700 }}>{results.duration || '—'}</div>

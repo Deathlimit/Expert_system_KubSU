@@ -499,32 +499,7 @@ tr:hover td { background: var(--table-hover); }
 .toast-info { background: var(--bg-accent); color: #fff; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
 
-/* ─── Server Wake-up Overlay ─── */
-.wakeup-overlay {
-  position: fixed; inset: 0; z-index: 10000;
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  animation: fadeIn .3s ease;
-}
-.wakeup-card {
-  background: var(--bg-card); color: var(--text);
-  border-radius: var(--radius);
-  padding: 40px 48px; text-align: center;
-  box-shadow: var(--shadow-lg);
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-}
-.wakeup-card h3 { font-size: 1.25rem; font-weight: 600; }
-.wakeup-card p { color: var(--text-secondary); font-size: .95rem; line-height: 1.5; }
-.wakeup-timer { font-variant-numeric: tabular-nums; color: var(--text-secondary); font-size: .85rem; }
-.wakeup-spinner {
-  width: 40px; height: 40px; border-radius: 50%;
-  border: 4px solid var(--border);
-  border-top-color: var(--bg-accent);
-  animation: spin 1s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+/* ─── Spinner ─── */
 
 /* ─── Tabs ─── */
 .tabs {
@@ -793,10 +768,6 @@ tr:hover td { background: var(--table-hover); }
   .modal-footer { flex-wrap: wrap; }
   .modal-footer .btn { flex: 1; min-width: 100px; }
 
-  /* Wakeup card on mobile */
-  .wakeup-card { padding: 28px 24px; margin: 16px; max-width: 360px; }
-  .wakeup-card h3 { font-size: 1.1rem; }
-
   /* Test containers on mobile */
   .test-taking-container,
   .test-result-container { padding: 1rem; }
@@ -842,7 +813,6 @@ tr:hover td { background: var(--table-hover); }
 
   /* Buttons: only form-submit and standalone actions go full-width */
   .login-form .btn,
-  .wakeup-card .btn,
   .empty-state + .btn,
   .modal-footer .btn { width: 100%; justify-content: center; }
 
@@ -858,9 +828,6 @@ tr:hover td { background: var(--table-hover); }
   .modal { padding: 18px; width: 98%; }
   .modal-header { margin-bottom: 14px; }
   .modal-title { font-size: 1.05rem; }
-
-  /* Wakeup */
-  .wakeup-card { padding: 24px 20px; margin: 12px; }
 
   /* Test actions bar — stack vertically */
   .test-actions { flex-direction: column; width: 100%; }

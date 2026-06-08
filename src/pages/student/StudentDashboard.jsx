@@ -76,11 +76,22 @@ function StudentContent() {
     navigate(`/student/test/${testId}`);
   };
 
+  const hasScores = history.some(r => r.score_percentage != null);
   const historyColumns = [
     { key: 'start_time', label: 'Дата начала' },
     { key: 'test_name', label: 'Название теста' },
     { key: 'attempt_number', label: 'Попытка' },
     { key: 'duration', label: 'Длительность' },
+    ...(hasScores ? [{ key: 'score_percentage', label: 'Балл', render: (v, row) => {
+      if (v == null) return '—';
+      const parts = [`${v.toFixed(1)}%`];
+      if (row.category_scores && Object.keys(row.category_scores).length > 0) {
+        for (const [cat, info] of Object.entries(row.category_scores)) {
+          parts.push(`${cat}: ${info.score}/${info.total}`);
+        }
+      }
+      return parts.join(' | ');
+    }}] : []),
     { key: 'final_status', label: 'Результат', render: (v) => (
       <span className={`badge ${v === 'Зачёт' || v === 'зачтено' || v === 'Passed' ? 'badge-green' : 'badge-red'}`}>{v || '—'}</span>
     )},
