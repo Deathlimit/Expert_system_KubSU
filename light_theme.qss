@@ -1,0 +1,377 @@
+/* General Widget Styling */
+QWidget {
+    background-color: #F0F0F0; /* Light gray background */
+    color: #000000; /* Black text */
+    font-size: 10pt;
+    border: none;
+}
+
+/* Labels */
+QLabel {
+    background-color: transparent;
+    color: #000000;
+    border: none;
+}
+QLabel#welcomeLabel {
+    font-size: 13pt;
+    font-weight: bold;
+}
+
+/* LineEdits */
+QLineEdit {
+    background-color: #FFFFFF; /* White background */
+    border: 1px solid #CCCCCC; /* Light gray border */
+    padding: 5px;
+    border-radius: 4px;
+    color: #000000;
+}
+QLineEdit:focus {
+    border: 1px solid #0078D7; /* Blue for focus - often kept for visibility */
+}
+QLineEdit:read-only {
+    background-color: #E0E0E0; /* Slightly darker gray for read-only */
+}
+
+/* PushButtons */
+QPushButton {
+    background-color: #E1E1E1; /* Light gray button */
+    border: 1px solid #ADADAD; /* Medium gray border */
+    padding: 6px 12px;
+    border-radius: 4px;
+    color: #000000;
+    min-height: 20px;
+}
+QPushButton:hover {
+    background-color: #CACACA; /* Darker gray on hover */
+    border: 1px solid #999999;
+}
+QPushButton:pressed {
+    background-color: #B0B0B0; /* Even darker on press */
+}
+QPushButton:disabled {
+    background-color: #D3D3D3; /* Lighter gray for disabled */
+    color: #888888; /* Dimmed text for disabled */
+}
+
+/* ComboBoxes */
+QComboBox {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    padding: 5px;
+    border-radius: 4px;
+    color: #000000;
+    selection-background-color: #0078D7; /* Blue for selection */
+    selection-color: #FFFFFF; /* White text for selection */
+}
+QComboBox:hover {
+    border: 1px solid #B0B0B0;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left-width: 1px;
+    border-left-color: #CCCCCC;
+    border-left-style: solid;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background-color: #E1E1E1;
+}
+QComboBox::down-arrow {
+    image: url(none); /* Consider adding an actual arrow icon resource */
+}
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    selection-background-color: #0078D7;
+    selection-color: #FFFFFF;
+    color: #000000;
+    padding: 2px;
+}
+
+/* ListWidgets */
+QListWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    padding: 2px;
+    border-radius: 4px;
+    color: #000000; /* Black text for the widget itself and inherited by items */
+    alternate-background-color: #F5F5F5; /* Light alternating color */
+}
+QListWidget::item {
+    padding: 4px;
+    color: #000000; /* Explicitly set default text color for items to black */
+    /* background-color is taken from QListWidget or alternate-background-color */
+}
+QListWidget::item:selected {
+    background-color: #0078D7;
+    color: #FFFFFF;
+}
+QListWidget::item:hover {
+    background-color: #E8E8E8; /* Light hover */
+    color: #000000; /* Ensure text is black on hover */
+}
+
+/* TableWidgets */
+QTableWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    color: #000000;
+    gridline-color: #D0D0D0; /* Light gridlines */
+    selection-background-color: #0078D7;
+    selection-color: #FFFFFF;
+}
+QTableWidget QHeaderView::section {
+    background-color: #E1E1E1; /* Light gray header */
+    color: #000000;
+    padding: 4px;
+    border: 1px solid #CCCCCC;
+    font-weight: bold;
+}
+QTableWidget::item {
+    padding: 3px;
+}
+
+/* GroupBoxes */
+QGroupBox {
+    background-color: #F5F5F5; /* Very light gray */
+    border: 1px solid #DCDCDC; /* Light border */
+    border-radius: 5px;
+    margin-top: 10px;
+    padding: 10px 5px 5px 5px;
+    font-weight: bold;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 5px 0 5px;
+    left: 10px;
+    color: #000000;
+    background-color: #E8E8E8; /* Light background for title */
+    border-radius: 3px;
+}
+
+/* ScrollBars */
+QScrollBar:vertical {
+    background: #F0F0F0;
+    width: 12px;
+    margin: 0px 0px 0px 0px;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical {
+    background: #C0C0C0; /* Silver handle */
+    min-height: 20px;
+    border-radius: 6px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    background: none;
+    height: 0px;
+}
+QScrollBar:horizontal {
+    background: #F0F0F0;
+    height: 12px;
+    margin: 0px 0px 0px 0px;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background: #C0C0C0;
+    min-width: 20px;
+    border-radius: 6px;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    background: none;
+    width: 0px;
+}
+
+/* ScrollArea */
+QScrollArea {
+    border: 1px solid #DCDCDC;
+    border-radius: 4px;
+    background-color: #F0F0F0;
+}
+
+/* CheckBoxes */
+QCheckBox {
+    spacing: 5px;
+    background-color: transparent;
+    color: #000000;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #ADADAD; /* Medium gray border */
+    border-radius: 3px;
+    background-color: #FFFFFF; /* White background for checkbox */
+}
+QCheckBox::indicator:checked {
+    background-color: #0078D7; /* Blue check */
+    /* Consider adding a white checkmark image for better contrast on blue */
+}
+QCheckBox::indicator:unchecked:hover {
+    border: 1px solid #888888; /* Darker border on hover */
+}
+
+/* RadioButtons */
+QRadioButton {
+    spacing: 5px;
+    background-color: transparent;
+    color: #000000;
+}
+QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #ADADAD;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+}
+QRadioButton::indicator:checked {
+    background-color: #0078D7;
+    /* Consider a white inner circle image for better contrast */
+}
+QRadioButton::indicator:unchecked:hover {
+    border: 1px solid #888888;
+}
+
+/* SpinBoxes */
+QSpinBox {
+    background-color: #FFFFFF;
+    border: 1px solid #CCCCCC;
+    padding: 4px;
+    border-radius: 4px;
+    color: #000000;
+}
+QSpinBox::up-button, QSpinBox::down-button {
+    subcontrol-origin: border;
+    background-color: #E1E1E1;
+    border: 1px solid #CCCCCC;
+    border-radius: 2px;
+}
+QSpinBox::up-button {
+    subcontrol-position: top right;
+    width: 16px;
+}
+QSpinBox::down-button {
+    subcontrol-position: bottom right;
+    width: 16px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #CACACA;
+}
+
+/* Dialogs (QDialog) & MainWindows (QMainWindow) */
+QDialog, QMainWindow {
+     background-color: #F0F0F0;
+}
+
+/* QDialogButtonBox */
+QDialogButtonBox QPushButton {
+    min-width: 80px;
+}
+
+/* QSplitter */
+QSplitter::handle {
+    background-color: #DCDCDC; /* Light gray handle */
+    border: 1px solid #F0F0F0;
+}
+QSplitter::handle:horizontal {
+    width: 5px;
+}
+QSplitter::handle:vertical {
+    height: 5px;
+}
+QSplitter::handle:pressed {
+    background-color: #C0C0C0; /* Silver when pressed */
+}
+
+/* QMessageBox */
+QMessageBox {
+    background-color: #F5F5F5;
+    border: 1px solid #DCDCDC;
+}
+QMessageBox QLabel {
+    background-color: transparent;
+    color: #000000;
+}
+QMessageBox QPushButton {
+    min-width: 80px;
+}
+
+/* Fixes for dark theme styles that might persist or look odd in light theme */
+/* ManagePremadeTestsDialog delete buttons */
+QPushButton#delete_test_button, QPushButton#delete_question_from_test_button { /* Assuming you might add objectNames for more specific styling */
+    background-color: #FFD2D2; /* Lighter red for light theme */
+    color: #500000; /* Darker red text for contrast */
+    border: 1px solid #FFB0B0;
+}
+QPushButton#delete_test_button:hover, QPushButton#delete_question_from_test_button:hover {
+    background-color: #FFC0C0;
+    border: 1px solid #FFA0A0;
+}
+QPushButton#delete_test_button:pressed, QPushButton#delete_question_from_test_button:pressed {
+    background-color: #FFB0B0;
+}
+
+/* CreatePremadeTestDialog checkbox (if needed, example of overriding general checkbox style) */
+QListWidget QCheckBox { /* Checkboxes inside QListWidget items, like in CreatePremadeTestDialog */
+    background-color: transparent;
+    color: #000000; /* Black text for light theme */
+    /* text-align: left; default, no need to set explicitly unless overriding */
+}
+
+/* Expanded text label in CreatePremadeTestDialog and ManagePremadeTestsDialog */
+QLabel#expandedQuestionTextLabel { /* Assuming an objectName is set for these labels */
+    padding: 5px;
+    border: 1px solid #D0D0D0;      /* Lighter border */
+    background-color: #FAFAFA;   /* Very light background */
+    color: #000000;               /* Black text */
+}
+
+/* Danger / destructive action buttons */
+QPushButton#dangerButton {
+    background-color: #D94040;
+    color: #FFFFFF;
+    border: 1px solid #C03030;
+}
+QPushButton#dangerButton:hover {
+    background-color: #E85050;
+    border: 1px solid #D04040;
+}
+QPushButton#dangerButton:pressed {
+    background-color: #B83030;
+}
+QPushButton#dangerButton:disabled {
+    background-color: #E0C0C0;
+    color: #888888;
+}
+
+/* Subtle status / hint labels */
+QLabel#statusLabel {
+    color: #666666;
+}
+
+/* ScrollArea for expanded text */
+QScrollArea#expandedQuestionScrollArea { /* Assuming an objectName */
+    border: none;
+    background-color: #FAFAFA; /* Match label background */
+}
+
+/* Ensure StudentWindow and AdminWindow labels are black if they were white for dark theme */
+/* (General QLabel rule above should cover this, but specific overrides might be needed if issues) */
+
+/* Specific styles from your dark_theme.qss that need light theme counterparts */
+/* EditSingleQuestionWindow delete button */
+QPushButton#delete_question_button_edit_single { /* Example specific objectName */
+    background-color: #FFD2D2;
+    color: #500000;
+    border: 1px solid #FFB0B0;
+}
+
+/* AddQuestionWindow matrices_display_area and ManagePremadeTestsDialog test_questions_list_widget */
+/* These are covered by general QLabel and QListWidget styles */
+
+/* CreatePremadeTestDialog select_all_checkbox (if it needs specific styling different from general QCheckBox) */
+/* QCheckBox#select_all_visible_checkbox_create_test { ... } */
+
+/* ManagePremadeTestsDialog edit_criteria_button_mng (general QPushButton style should apply) */
+
+/* Make sure to add objectNames to widgets in your Python code if you want to use these specific selectors (e.g., my_button.setObjectName("mySpecialButton")) */ 
