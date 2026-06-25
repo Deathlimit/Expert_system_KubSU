@@ -3888,7 +3888,7 @@ class ManageTestsPanel(QWidget):
     def _get_share_url(self):
         if not self._share_token:
             return ""
-        return f"https://expert-system-431h.onrender.com/#/join/{self._share_token}"
+        return f"https://testing.k-lab.su/#/join/{self._share_token}"
 
     def _update_share_link_display(self):
         if self._share_token:
