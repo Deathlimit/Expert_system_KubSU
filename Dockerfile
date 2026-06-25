@@ -1,4 +1,4 @@
-# Stage 1: Build React frontend
+# 1: Build React frontend
 FROM node:22-alpine AS frontend-builder
 
 WORKDIR /frontend
@@ -13,7 +13,7 @@ ENV VITE_API_BASE=
 ENV VITE_BASE=/
 RUN npm run build
 
-# Stage 2: Runtime
+# 2: Runtime
 FROM python:3.11-alpine
 
 WORKDIR /app

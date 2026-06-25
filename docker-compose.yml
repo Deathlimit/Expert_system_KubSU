@@ -5,9 +5,9 @@ services:
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=prikol2805
-      - MONGO_INITDB_DATABASE=testing_expert
+      - MONGO_INITDB_ROOT_USERNAME=#
+      - MONGO_INITDB_ROOT_PASSWORD=#
+      - MONGO_INITDB_DATABASE=#
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -25,8 +25,8 @@ services:
       - "8000:8000"
     environment:
       - PORT=8000
-      - JWT_SECRET=testing-expert-system-jwt-secret-2026
-      - MONGO_URI=mongodb://admin:prikol2805@mongodb:27017/testing_expert?authSource=admin
+      - JWT_SECRET=#
+      - MONGO_URI=#
     depends_on:
       mongodb:
         condition: service_healthy
