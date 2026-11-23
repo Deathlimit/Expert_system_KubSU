@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import * as api from '../../api';
 import SortableTable from '../../components/SortableTable';
 import Modal from '../../components/Modal';
+import StudentPortrait, { portraitBrief } from '../../components/StudentPortrait';
 import { useToast } from '../../components/Toast';
 import { FiUserPlus, FiRefreshCw, FiEye, FiClock } from 'react-icons/fi';
 
@@ -99,6 +100,7 @@ export default function StudentProfiles() {
       status: meta.label,
       status_code: task?.status || 'none',
       _task: task,
+      _brief: task?.status === 'done' ? portraitBrief(task.result) : null,
     };
   });
 
@@ -112,6 +114,22 @@ export default function StudentProfiles() {
       render: (_, row) => {
         const meta = STATUS_META[row.status_code] || STATUS_META.none;
         return <span className={`badge ${meta.cls}`}>{meta.label}</span>;
+      },
+    },
+    {
+      key: '_brief',
+      label: 'Уровень',
+      render: (_, row) => {
+        if (!row._brief) return '—';
+        const { level, levelCls, average } = row._brief;
+        return (
+          <div className="flex flex-col gap-xs">
+            {level && <span className={`badge ${levelCls}`}>{level}</span>}
+            {average != null && (
+              <span className="text-xs text-secondary">Ср. балл: {average}%</span>
+            )}
+          </div>
+        );
       },
     },
     {
@@ -169,17 +187,7 @@ export default function StudentProfiles() {
           {viewedTask.status === 'failed' ? (
             <p className="text-sm" style={{ color: 'var(--color-red)' }}>{viewedTask.error || 'Ошибка задачи'}</p>
           ) : (
-            <pre style={{
-              background: 'var(--bg-input)',
-              padding: '.75rem',
-              borderRadius: 6,
-              fontSize: '.8rem',
-              overflow: 'auto',
-              maxHeight: 480,
-              margin: 0,
-            }}>
-{JSON.stringify(viewedTask.result, null, 2)}
-            </pre>
+            <StudentPortrait task={viewedTask} />
           )}
         </Modal>
       )}
