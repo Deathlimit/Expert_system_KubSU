@@ -218,6 +218,46 @@ def build_facts(results: list, max_errors: int = 30) -> tuple:
     return facts, errors
 
 
+def quick_stats(results: list) -> dict:
+    """Лёгкая сводка по результатам: средний балл, зачёты и проценты по темам.
+
+    Нужна для сравнения с группой: гонять полный build_facts по каждому
+    студенту группы слишком дорого, а здесь требуются только числа.
+    """
+    attempts = len(results)
+    scores = [float(r.get("score_percentage") or 0) for r in results]
+    passed = sum(1 for r in results if r.get("final_status") in ("Зачёт", "Passed"))
+
+    topics: dict = {}
+    for r in results:
+        for topic, info in (r.get("category_scores") or {}).items():
+            if not isinstance(info, dict):
+                continue
+            total = float(info.get("total") or 0)
+            if total <= 0:
+                continue
+            agg = topics.setdefault(topic, {"score": 0.0, "total": 0.0})
+            agg["score"] += float(info.get("score") or 0)
+            agg["total"] += total
+
+    topic_stats = [
+        {
+            "topic": topic,
+            "percentage": round((agg["score"] / agg["total"]) * 100, 1) if agg["total"] else 0.0,
+            "questions": int(agg["total"]),
+        }
+        for topic, agg in topics.items()
+    ]
+    topic_stats.sort(key=lambda t: t["percentage"])
+
+    return {
+        "attempts": attempts,
+        "average_score": round(sum(scores) / attempts, 1) if attempts else None,
+        "pass_rate": round((passed / attempts) * 100, 1) if attempts else None,
+        "topics": topic_stats,
+    }
+
+
 def level_from_score(average_score: float) -> str:
     if average_score < 50:
         return "начальный"

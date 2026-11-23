@@ -17,10 +17,12 @@ Render:
     start: uvicorn main:app --host 0.0.0.0 --port $PORT
 """
 
+import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -41,11 +43,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Без этого периодический self-ping писал бы в лог строку httpx на каждый запрос.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "").split(",") if os.environ.get("CORS_ORIGINS") else ["*"]
 
 # Neural-сервис (/portraits, Ollama) осознанно отсутствует: его роль
 # выполняет домашний воркер очереди.
 SERVICES = ("auth", "content", "tests", "sessions", "queue")
+
+# Пинг собственного /health: бесплатный Render засыпает после 15 минут без
+# трафика, а свой запрос — это трафик. Адрес Render подставляет сам
+# (RENDER_EXTERNAL_URL); локально переменной нет — keep-alive выключается.
+KEEPALIVE_ENABLED = os.environ.get("KEEPALIVE_ENABLED", "true").strip().casefold() not in (
+    "false", "0", "no", "off",
+)
+KEEPALIVE_INTERVAL = float(os.environ.get("KEEPALIVE_INTERVAL_SECONDS", "60"))
+KEEPALIVE_URL = (
+    os.environ.get("KEEPALIVE_URL")
+    or os.environ.get("RENDER_EXTERNAL_URL")
+    or os.environ.get("INTERNAL_BASE_URL")
+    or ""
+).rstrip("/")
+
+
+async def _keepalive_loop() -> None:
+    """Раз в интервал дёргаем свой /health, пока сервис живёт."""
+    url = f"{KEEPALIVE_URL}/health"
+    async with httpx.AsyncClient(timeout=30) as client:
+        while True:
+            # Сначала ждём интервал: на старте lifespan сервер ещё не принимает
+            # соединения, и запрос к себе же сразу упал бы.
+            await asyncio.sleep(KEEPALIVE_INTERVAL)
+            try:
+                response = await client.get(url)
+                logger.info("Keep-alive: GET %s -> %s", url, response.status_code)
+            except Exception as exc:  # noqa: BLE001 — пинг не должен ронять сервис
+                logger.warning("Keep-alive: не удалось дёрнуть %s: %s", url, exc)
 
 
 @asynccontextmanager
@@ -66,8 +100,18 @@ async def lifespan(app: FastAPI):
     # Queue
     queue_db.get_tasks_col()
     queue_db.get_profiles_col()
+    keepalive_task = None
+    if KEEPALIVE_ENABLED and KEEPALIVE_URL:
+        keepalive_task = asyncio.create_task(_keepalive_loop())
+        logger.info("Keep-alive включён: %s каждые %.0f с", KEEPALIVE_URL, KEEPALIVE_INTERVAL)
+    else:
+        logger.info("Keep-alive выключен (нет адреса для self-call или KEEPALIVE_ENABLED=false).")
     logger.info("Expert System API ready.")
     yield
+    if keepalive_task:
+        keepalive_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await keepalive_task
     logger.info("Expert System API shutting down.")
 
 

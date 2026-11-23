@@ -23,6 +23,7 @@ from pymongo import ReturnDocument
 
 from .database import (
     LEASE_SECONDS,
+    get_portrait_history_col,
     get_portraits_col,
     get_profiles_col,
     get_results_col,
@@ -30,7 +31,7 @@ from .database import (
     get_users_col,
     now_utc,
 )
-from .features import build_facts, input_hash
+from .features import build_facts, input_hash, level_from_score, quick_stats
 from .llm import build_request, fallback_portrait, parse_response
 from .llm_config import LLM_MAX_ERRORS, LLM_THINK, OLLAMA_MODEL
 from .models import DEFAULT_TASK_TYPE, CreateTaskBody
@@ -41,6 +42,7 @@ ACTIVE_STATUSES = ("queued", "in_progress")
 FINISHED_STATUSES = ("done", "failed")
 ROLE_TEACHER = "teacher"
 ROLE_ADMIN = "admin"
+ROLE_STUDENT = "student"
 
 
 def _iso(value):
@@ -218,6 +220,29 @@ def _save_profile(task: dict, result: Any) -> Optional[str]:
                 },
                 upsert=True,
             )
+            student = (task.get("payload") or {}).get("student")
+            group_name = student.get("group") if isinstance(student, dict) else None
+            # История: одна запись на уникальный input_hash. Повторный прогон
+            # тех же данных обновляет generated_at, а не плодит дубли.
+            get_portrait_history_col().update_one(
+                {"username": username, "input_hash": results_digest},
+                {
+                    "$set": {
+                        "username": username,
+                        "input_hash": results_digest,
+                        "group": group_name,
+                        "generated_at": result.get("generated_at") or now.isoformat(),
+                        "model": result.get("model"),
+                        "source": result.get("source"),
+                        "llm_error": result.get("llm_error"),
+                        "facts": result.get("facts") or {},
+                        "errors_count": result.get("errors_count") or 0,
+                        "portrait": portrait,
+                        "queue_task_id": task["_id"],
+                    }
+                },
+                upsert=True,
+            )
     except Exception as exc:  # noqa: BLE001 — задачу всё равно помечаем done
         logger.exception("Failed to save profile for %s", username)
         return f"{type(exc).__name__}: {exc}"
@@ -270,6 +295,10 @@ def _complete_task(task_id: str, body: dict) -> dict:
         update.update({"status": "failed", "error": str(error)[:2000]})
     else:
         result = _normalize_result(_get_doc_or_404(task_id), result)
+        # Отметка времени генерации видна и в задаче, и в истории: без неё
+        # фронт не знает, когда портрет построен.
+        if isinstance(result, dict) and not result.get("generated_at"):
+            result["generated_at"] = now_utc().isoformat()
         update.update({"status": "done", "result": result})
 
     # Разрешаем завершить и только что захваченную, и ещё queued задачу
@@ -377,3 +406,92 @@ def pending_tasks(limit: int) -> list:
 
     docs = col.find({"status": "queued"}).sort("created_at", 1).limit(limit)
     return [public_task(doc) for doc in docs]
+
+
+def _group_snapshot(group_name: str, usernames: list) -> dict:
+    """Средние по группе: балл, зачёты и проценты по темам.
+
+    Среднее считаем по студентам, а не по всем попыткам: иначе студент с
+    десятком пересдач перевесил бы всю группу. По темам усредняем только
+    среди тех, у кого тема вообще встречалась.
+    """
+    results_col = get_results_col()
+    averages = []
+    pass_rates = []
+    topic_acc: dict = {}
+    for name in usernames:
+        stats = quick_stats(list(results_col.find({"username": name}, {"_id": 0})))
+        if stats["average_score"] is not None:
+            averages.append(stats["average_score"])
+        if stats["pass_rate"] is not None:
+            pass_rates.append(stats["pass_rate"])
+        for topic in stats["topics"]:
+            topic_acc.setdefault(topic["topic"], []).append(topic["percentage"])
+
+    topics = [
+        {"topic": topic, "percentage": round(sum(values) / len(values), 1)}
+        for topic, values in topic_acc.items()
+        if values
+    ]
+    topics.sort(key=lambda t: t["percentage"])
+    average = round(sum(averages) / len(averages), 1) if averages else None
+    return {
+        "name": group_name,
+        "size": len(usernames),
+        "average_score": average,
+        "pass_rate": round(sum(pass_rates) / len(pass_rates), 1) if pass_rates else None,
+        "level": level_from_score(average) if average is not None else None,
+        "topics": topics,
+    }
+
+
+def student_insights(username: str, user: dict) -> dict:
+    """История портретов студента и сравнение с его группой."""
+    if user.get("role") not in (ROLE_TEACHER, ROLE_ADMIN):
+        raise HTTPException(403, "История портретов доступна только преподавателю и администратору.")
+    username = (username or "").strip()
+    if not username:
+        raise HTTPException(400, "Укажите username.")
+
+    history = []
+    for doc in get_portrait_history_col().find({"username": username}).sort("generated_at", 1):
+        facts = doc.get("facts") or {}
+        portrait = doc.get("portrait") or {}
+        history.append(
+            {
+                "generated_at": _iso(doc.get("generated_at")),
+                "input_hash": doc.get("input_hash"),
+                "model": doc.get("model"),
+                "source": doc.get("source"),
+                "level": portrait.get("level"),
+                "risk_of_failing": portrait.get("risk_of_failing"),
+                "average_score": facts.get("average_score"),
+                "pass_rate": facts.get("pass_rate"),
+                "open_gaps": facts.get("open_gaps"),
+                "attempts": facts.get("attempts"),
+                "errors_count": doc.get("errors_count"),
+            }
+        )
+
+    student = get_users_col().find_one(
+        {"username": username}, {"_id": 0, "group": 1, "full_name": 1}
+    ) or {}
+    group_name = (student.get("group") or "").strip()
+    group = None
+    if group_name:
+        members = [
+            u["username"]
+            for u in get_users_col().find(
+                {"group": group_name, "role": ROLE_STUDENT}, {"_id": 0, "username": 1}
+            )
+        ]
+        if username not in members:
+            members.append(username)
+        group = _group_snapshot(group_name, members)
+
+    return {
+        "username": username,
+        "full_name": student.get("full_name", ""),
+        "group": group,
+        "history": history,
+    }

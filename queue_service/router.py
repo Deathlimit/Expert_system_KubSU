@@ -12,6 +12,7 @@ from .service import (
     get_task_for_user,
     list_tasks,
     pending_tasks,
+    student_insights,
 )
 
 router = APIRouter(prefix="/queue", tags=["queue"])
@@ -41,6 +42,15 @@ async def get_pending_tasks(
 ):
     """Воркер узнаёт, какие задачи сейчас в очереди (без захвата)."""
     return pending_tasks(limit)
+
+
+@router.get("/insights")
+async def get_insights(
+    username: str = Query(..., min_length=1),
+    user=Depends(get_current_user),
+):
+    """История портретов студента и сравнение с его группой."""
+    return student_insights(username, user)
 
 
 @router.get("/tasks/{task_id}")

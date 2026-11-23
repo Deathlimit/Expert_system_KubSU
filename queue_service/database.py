@@ -66,6 +66,13 @@ def get_portraits_col():
     return col
 
 
+def get_portrait_history_col():
+    """История сгенерированных портретов: по записи на уникальный input_hash."""
+    col = get_db()["student_portrait_history"]
+    col.create_index([("username", ASCENDING), ("generated_at", ASCENDING)])
+    return col
+
+
 def get_users_col():
     return get_db()["users"]
 

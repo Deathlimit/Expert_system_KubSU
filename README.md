@@ -100,7 +100,21 @@ uvicorn main:app --reload --port 8000
 
 Воркеру нужен только исходящий интернет и локальная Ollama. Он берёт задачу
 из `/queue`, отправляет готовый `request` в `/api/chat` и возвращает ответ.
-Готовый пример лежит в основном проекте — `backend/queue_service/worker_example.py`:
+
+**Рекомендуется — докеризованный воркер** (каталог `worker/` в корне проекта):
+
+```powershell
+cd worker
+Copy-Item .env.example .env      # необязательно: умолчания уже верные
+docker compose up -d --build
+docker compose logs -f
+```
+
+Он сам опрашивает очередь, а при недоступной Ollama не роняет задачу, а
+возвращает её в очередь и ждёт. Подробности — в `worker/README.md`.
+
+Альтернатива без Docker — пример в исходном проекте
+`backend/queue_service/worker_example.py`:
 
 ```powershell
 cd backend
@@ -115,7 +129,9 @@ python queue_service/worker_example.py
 Один проход по очереди и выход: `python queue_service/worker_example.py --once`.
 
 Бесплатный Render засыпает без трафика — регулярный опрос очереди воркером
-как раз не даёт сервису уснуть.
+как раз не даёт сервису уснуть. Дополнительно сам бэкенд раз в минуту
+дёргает свой `/health` (`KEEPALIVE_*`), поэтому сервис не засыпает даже
+когда воркер выключен.
 
 ## Основные маршруты
 
@@ -145,6 +161,9 @@ GET    /health
 | `JWT_SECRET` | dev-значение | подпись JWT |
 | `CORS_ORIGINS` | `*` | origins через запятую |
 | `WORKER_TOKEN` | пусто | токен домашнего воркера |
+| `KEEPALIVE_ENABLED` | `true` | self-ping `/health`, чтобы Render не засыпал |
+| `KEEPALIVE_INTERVAL_SECONDS` | `60` | интервал self-ping в секундах |
+| `KEEPALIVE_URL` | `RENDER_EXTERNAL_URL` | свой адрес для self-ping |
 | `QUEUE_LEASE_SECONDS` | `600` | возврат зависших задач |
 | `QUEUE_TASK_TTL_SECONDS` | `0` | TTL завершённых задач |
 | `OLLAMA_MODEL` | `gemma4:12b` | модель по умолчанию в контракте |
