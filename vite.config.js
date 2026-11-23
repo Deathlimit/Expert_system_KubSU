@@ -13,4 +13,4 @@ export default defineConfig(({ mode }) => ({
       '/sessions': 'http://localhost:8004',
     },
   },
-}));
+})); 
