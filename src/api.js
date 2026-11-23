@@ -6,6 +6,7 @@ const AUTH = `${API_BASE}/auth`;
 const CONTENT = `${API_BASE}/content`;
 const TESTS = `${API_BASE}/tests`;
 const SESSIONS = `${API_BASE}/sessions`;
+const QUEUE = `${API_BASE}/queue`;
 
 function authHeaders() {
   const token = localStorage.getItem('token');
@@ -229,4 +230,25 @@ export async function getTestAggregateStats(testId) {
 }
 export async function verifyToken() {
   return request('GET', `${AUTH}/verify`);
+}
+
+/* ── Queue (создание профиля студента) ── */
+export async function createStudentProfileTask(username, { force = false } = {}) {
+  return request('POST', `${QUEUE}/tasks`, {
+    type: 'create_student_profile',
+    username,
+    force,
+  });
+}
+export async function getQueueTask(taskId) {
+  return request('GET', `${QUEUE}/tasks/${encodeURIComponent(taskId)}`);
+}
+export async function listQueueTasks({ status, type, username, limit = 100 } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.append('status', status);
+  if (type) params.append('type', type);
+  if (username) params.append('username', username);
+  if (limit) params.append('limit', String(limit));
+  const query = params.toString();
+  return request('GET', `${QUEUE}/tasks${query ? `?${query}` : ''}`);
 }

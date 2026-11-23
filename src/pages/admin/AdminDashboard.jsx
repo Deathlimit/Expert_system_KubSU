@@ -9,7 +9,7 @@ import MobileTopbar from '../../components/MobileTopbar';
 import * as api from '../../api';
 import {
   FiUsers, FiPlusCircle, FiEdit, FiFileText,
-  FiSettings, FiGrid, FiSliders, FiUpload, FiLayers, FiHelpCircle, FiCopy, FiCheck
+  FiSettings, FiGrid, FiSliders, FiUpload, FiLayers, FiHelpCircle, FiCopy, FiCheck, FiUserPlus
 } from 'react-icons/fi';
 
 import AddQuestion from '../teacher/AddQuestion';
@@ -18,6 +18,7 @@ import CreateTest from '../teacher/CreateTest';
 import ManageTests from '../teacher/ManageTests';
 import GenerateTest from '../teacher/GenerateTest';
 import GradingCriteria from '../teacher/GradingCriteria';
+import StudentProfiles from '../teacher/StudentProfiles';
 
 const sidebarLinks = [
   {
@@ -38,6 +39,11 @@ const sidebarLinks = [
       { id: 'create', text: 'Создать тест', icon: <FiFileText size={18} />, path: '/admin/create-test' },
       { id: 'manage', text: 'Управление тестами', icon: <FiSettings size={18} />, path: '/admin/manage-tests' },
       { id: 'generate', text: 'Сгенерировать тест', icon: <FiGrid size={18} />, path: '/admin/generate-test' },
+    ]
+  },
+  {
+    label: 'Студенты', items: [
+      { id: 'profiles', text: 'Профили студентов', icon: <FiUserPlus size={18} />, path: '/admin/profiles' },
     ]
   },
   {
@@ -66,6 +72,7 @@ export default function AdminDashboard() {
             <Route path="create-test" element={<CreateTest />} />
             <Route path="manage-tests" element={<ManageTests />} />
             <Route path="generate-test" element={<GenerateTest />} />
+            <Route path="profiles" element={<StudentProfiles />} />
             <Route path="criteria" element={<GradingCriteria />} />
           </Routes>
         </main>

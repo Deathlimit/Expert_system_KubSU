@@ -6,7 +6,7 @@ import { ToastProvider } from '../../components/Toast';
 import MobileTopbar from '../../components/MobileTopbar';
 import {
   FiPlusCircle, FiEdit, FiFileText, FiSettings,
-  FiGrid, FiSliders, FiBarChart2, FiUpload
+  FiGrid, FiSliders, FiBarChart2, FiUpload, FiUserPlus
 } from 'react-icons/fi';
 
 import AddQuestion from './AddQuestion';
@@ -16,6 +16,7 @@ import CreateTest from './CreateTest';
 import ManageTests from './ManageTests';
 import GenerateTest from './GenerateTest';
 import GradingCriteria from './GradingCriteria';
+import StudentProfiles from './StudentProfiles';
 
 const sidebarLinks = [
   {
@@ -30,6 +31,11 @@ const sidebarLinks = [
       { id: 'create', text: 'Создать тест', icon: <FiFileText size={18} />, path: '/teacher/create-test' },
       { id: 'manage', text: 'Управление тестами', icon: <FiSettings size={18} />, path: '/teacher/manage-tests' },
       { id: 'generate', text: 'Сгенерировать тест', icon: <FiGrid size={18} />, path: '/teacher/generate-test' },
+    ]
+  },
+  {
+    label: 'Студенты', items: [
+      { id: 'profiles', text: 'Профили студентов', icon: <FiUserPlus size={18} />, path: '/teacher/profiles' },
     ]
   },
   {
@@ -56,6 +62,7 @@ export default function TeacherDashboard() {
             <Route path="create-test" element={<CreateTest />} />
             <Route path="manage-tests" element={<ManageTests />} />
             <Route path="generate-test" element={<GenerateTest />} />
+            <Route path="profiles" element={<StudentProfiles />} />
             <Route path="criteria" element={<GradingCriteria />} />
           </Routes>
         </main>

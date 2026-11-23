@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => ({
       '/content':  'http://localhost:8002',
       '/tests':    'http://localhost:8003',
       '/sessions': 'http://localhost:8004',
+      '/portraits': 'http://localhost:8005',
+      '/queue':    'http://localhost:8006',
     },
   },
-})); 
+}));
