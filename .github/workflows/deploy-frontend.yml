@@ -29,15 +29,28 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      # configure-pages ДО сборки: он отдаёт base_path. Для project pages
+      # это /<repo>/ — без него ассеты собираются с base "/" и на
+      # https://<user>.github.io/<repo>/ дают 404.
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Install dependencies
         run: npm ci
 
       - name: Build
+        env:
+          VITE_BASE: ${{ steps.pages.outputs.base_path }}
+          # Адрес бэкенда на Render. Задайте в Settings -> Secrets and
+          # variables -> Actions -> Variables (имя VITE_API_BASE),
+          # иначе фронт будет стучаться в свой же origin и получит 404.
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
         run: npm run build
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
+      # Артефакт ОБЯЗАН называться github-pages — его создаёт этот шаг.
+      # Если он не выполнится, deploy-pages упадёт с ошибкой
+      # "No artifacts named github-pages were found".
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
