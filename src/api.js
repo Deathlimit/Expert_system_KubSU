@@ -243,6 +243,9 @@ export async function createStudentProfileTask(username, { force = false } = {})
 export async function getQueueTask(taskId) {
   return request('GET', `${QUEUE}/tasks/${encodeURIComponent(taskId)}`);
 }
+export async function getStudentInsights(username) {
+  return request('GET', `${QUEUE}/insights?username=${encodeURIComponent(username)}`);
+}
 export async function listQueueTasks({ status, type, username, limit = 100 } = {}) {
   const params = new URLSearchParams();
   if (status) params.append('status', status);

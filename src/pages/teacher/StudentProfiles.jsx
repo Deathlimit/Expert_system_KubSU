@@ -24,6 +24,8 @@ export default function StudentProfiles() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState({});
   const [viewedUser, setViewedUser] = useState(null);
+  const [insights, setInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,6 +78,24 @@ export default function StudentProfiles() {
       clearInterval(timer);
     };
   }, [tasks]);
+
+  // Открыли модалку — подтягиваем историю портретов и агрегат по группе.
+  useEffect(() => {
+    if (!viewedUser) {
+      setInsights(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setInsightsLoading(true);
+    api.getStudentInsights(viewedUser).then((res) => {
+      if (cancelled) return;
+      setInsights(res.ok ? res.data : null);
+      setInsightsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedUser]);
 
   const handleCreate = async (student) => {
     const username = student.username;
@@ -187,7 +207,7 @@ export default function StudentProfiles() {
           {viewedTask.status === 'failed' ? (
             <p className="text-sm" style={{ color: 'var(--color-red)' }}>{viewedTask.error || 'Ошибка задачи'}</p>
           ) : (
-            <StudentPortrait task={viewedTask} />
+            <StudentPortrait task={viewedTask} insights={insights} insightsLoading={insightsLoading} />
           )}
         </Modal>
       )}
