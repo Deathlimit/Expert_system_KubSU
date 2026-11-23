@@ -21,9 +21,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -34,7 +34,7 @@ jobs:
       # https://<user>.github.io/<repo>/ дают 404.
       - name: Setup Pages
         id: pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Install dependencies
         run: npm ci
@@ -42,20 +42,21 @@ jobs:
       - name: Build
         env:
           VITE_BASE: ${{ steps.pages.outputs.base_path }}
-          # Адрес бэкенда на Render. Задайте в Settings -> Secrets and
-          # variables -> Actions -> Variables (имя VITE_API_BASE),
-          # иначе фронт будет стучаться в свой же origin и получит 404.
-          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          # Адрес бэкенда на Render. Берём из переменной репозитория
+          # VITE_API_BASE, а если она не задана — этот дефолт.
+          # Без хвостового "/": фронт сам добавляет "/auth", "/queue" и т.д.
+          VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://expert-system-431h.onrender.com' }}
         run: npm run build
 
-      # Артефакт ОБЯЗАН называться github-pages — его создаёт этот шаг.
-      # Если он не выполнится, deploy-pages упадёт с ошибкой
-      # "No artifacts named github-pages were found".
+      # v5 обязателен: он собирает артефакт через upload-artifact@v7,
+      # совместимый с Node 24. Старый v3 на новых раннерах отчитывается
+      # успехом, но артефакт "github-pages" не регистрируется, и
+      # deploy-pages падает с "No artifacts named github-pages".
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
