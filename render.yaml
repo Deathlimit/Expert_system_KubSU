@@ -1,0 +1,45 @@
+# Blueprint Render: бэкенд Expert System БЕЗ нейросети.
+#
+# Здесь только API и очередь задач. Ollama/portrait_service не входят:
+# портреты считает домашний воркер, забирая задания из /queue.
+#
+# Если этот каталог — корень репозитория, оставьте как есть.
+# Если репозиторий — родительский проект, добавьте в сервис:
+#   rootDir: backend_render
+services:
+  - type: web
+    name: expert-system-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Версия Python как в Dockerfile: под неё собраны колёса зависимостей.
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Atlas: файловая система Render стирается между деплоями.
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # Фронтенд на другом origin — разрешаем всем, если не задано иное.
+      - key: CORS_ORIGINS
+        value: "*"
+      # Токен домашнего воркера очереди. Пусто — доступ без токена (только dev).
+      - key: WORKER_TOKEN
+        sync: false
+      # Сколько задание может висеть «в процессе» до возврата в очередь.
+      - key: QUEUE_LEASE_SECONDS
+        value: "600"
+      # 0 — хранить завершённые задачи бессрочно.
+      - key: QUEUE_TASK_TTL_SECONDS
+        value: "0"
+      # Контракт с домашней моделью. Модель и режим воркер может
+      # переопределить у себя — в тело /api/chat он всё равно подставит свои.
+      - key: OLLAMA_MODEL
+        value: "gemma4:12b"
+      - key: LLM_THINK
+        value: "false"
+      - key: LLM_MAX_ERRORS
+        value: "30"

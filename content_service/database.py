@@ -39,7 +39,7 @@ def get_db():
 
 
 def get_questions_dict(db) -> dict:
-    """Return all questions grouped as {topic: [question, ...]}."""
+    # Возвращает вопросы, сгруппированные по темам
     result: dict = {}
     for doc in db["questions"].find({}, {"_id": 0}):
         topic = doc.get("topic", "unknown")
@@ -50,6 +50,7 @@ def get_questions_dict(db) -> dict:
 
 
 def get_criteria(db, key: str) -> Optional[dict]:
+    # Получение критериев оценивания по ключу
     doc = db["criteria"].find_one({"key": key}, {"_id": 0, "key": 0})
     if doc and isinstance(doc.get("topic_criteria"), list):
         return doc

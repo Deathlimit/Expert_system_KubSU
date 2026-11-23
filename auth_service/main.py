@@ -1,11 +1,12 @@
 ﻿import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import get_db
-from router import router
+from .database import get_db, ensure_demo_test
+from .router import router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,11 +14,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "").split(",") if os.environ.get("CORS_ORIGINS") else ["*"]
+
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(app: FastAPI):
     logger.info("Auth Service starting up...")
     get_db()
+    ensure_demo_test()
+
     logger.info("Auth Service ready.")
     yield
     logger.info("Auth Service shutting down.")
@@ -26,7 +31,8 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Auth Service", version="1.0.0", root_path="/", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=bool(CORS_ORIGINS != ["*"]),
     allow_methods=["*"], allow_headers=["*"],
 )
 app.include_router(router)

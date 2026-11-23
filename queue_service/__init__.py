@@ -1,0 +1,1 @@
+"""Queue Service package (HTTP polling)."""

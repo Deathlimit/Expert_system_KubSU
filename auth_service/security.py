@@ -19,8 +19,6 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash. Supports legacy SHA-256 and bcrypt."""
-    # Legacy SHA-256 hashes are exactly 64 hex characters
     if len(hashed) == 64:
         try:
             int(hashed, 16)
@@ -33,15 +31,17 @@ def verify_password(password: str, hashed: str) -> bool:
         return False
 
 
-def create_token(username: str, role: str) -> str:
+def create_token(username: str, role: str, token_version: int = 0) -> str:
     payload = {
         "sub": username,
         "role": role,
+        "tv": token_version,
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+# Проверка JWT токена
 def verify_token(token: str) -> dict:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -51,6 +51,7 @@ def verify_token(token: str) -> dict:
         raise HTTPException(401, "Invalid token")
 
 
+# Получение текущего пользователя из токена
 async def get_current_user(authorization: str = Header(...)):
     if not authorization.startswith("Bearer "):
         raise HTTPException(401, "Invalid authorization header")
