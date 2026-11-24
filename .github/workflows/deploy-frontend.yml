@@ -42,10 +42,12 @@ jobs:
       - name: Build
         env:
           VITE_BASE: ${{ steps.pages.outputs.base_path }}
-          # Адрес бэкенда на Render. Берём из переменной репозитория
-          # VITE_API_BASE, а если она не задана — этот дефолт.
+          # Адрес API. По умолчанию — Cloudflare Worker-прокси: onrender.com
+          # блокируется в РФ, поэтому браузер ходит на workers.dev, а воркер
+          # пересылает запрос на Render (см. cloudflare/README.md).
+          # Берём из переменной репозитория VITE_API_BASE, а если её нет — этот дефолт.
           # Без хвостового "/": фронт сам добавляет "/auth", "/queue" и т.д.
-          VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://expert-system-431h.onrender.com' }}
+          VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://expert-api-proxy.danilreshetka.workers.dev' }}
         run: npm run build
 
       # v5 обязателен: он собирает артефакт через upload-artifact@v7,
