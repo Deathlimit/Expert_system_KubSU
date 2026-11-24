@@ -15,11 +15,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  # Сборка и загрузка артефакта — ОТДЕЛЬНЫМ job'ом от деплоя.
+  #
+  # Почему два job'а, а не один: upload-pages-artifact и deploy-pages в одном
+  # job'е ловят гонку. Артефакт финализируется за доли секунды до того, как
+  # deploy-pages запросит список артефактов, API успевает вернуть пустой
+  # список, и шаг падает с "No artifacts named github-pages"
+  # (а повторный запуск того же run'а добавляет второй артефакт и ломается
+  # уже на "Multiple artifacts ... Artifact count is 2").
+  # См. actions/deploy-pages#451.
+  # Отдельный job стартует через несколько секунд после загрузки — артефакт
+  # к этому моменту уже точно виден, и lookup не гоняется.
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
 
@@ -50,15 +58,20 @@ jobs:
           VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://expert-api-proxy.danilreshetka.workers.dev' }}
         run: npm run build
 
-      # v5 обязателен: он собирает артефакт через upload-artifact@v7,
-      # совместимый с Node 24. Старый v3 на новых раннерах отчитывается
-      # успехом, но артефакт "github-pages" не регистрируется, и
-      # deploy-pages падает с "No artifacts named github-pages".
+      # v5 идёт в паре с deploy-pages@v5 (артефакт "github-pages").
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
+  # Отдельный job: lookup артефакта идёт уже по стабильному списку.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
